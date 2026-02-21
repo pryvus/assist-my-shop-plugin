@@ -18,7 +18,7 @@
  *
  * @since 1.0.0
  */
-class AMS_WC_Sync {
+class AMS_Sync_WC {
 
 	/**
 	 * Initialize WooCommerce synchronization hooks.

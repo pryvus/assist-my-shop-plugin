@@ -6,10 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Ensure interface is available
-require_once AMS_PATH . '/includes/interfaces/class-ams-sync-interface.php';
-
-class AMS_Sync_Handler implements AMS_Sync_Interface {
+class AMS_Sync_Handler {
 
 	private static ?AMS_Sync_Handler $instance = null;
 	private AMS_Api_Messenger $api_messenger;

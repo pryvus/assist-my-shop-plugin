@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AMS_Logger {
+trait AMS_Logger {
 
     /**
      * Whether logging is enabled (option or WP_DEBUG)
@@ -100,4 +100,5 @@ class AMS_Logger {
         $dir = trailingslashit( $uploads['basedir'] ) . 'ams-logs';
         return $dir . DIRECTORY_SEPARATOR . 'ams.log';
     }
+
 }
