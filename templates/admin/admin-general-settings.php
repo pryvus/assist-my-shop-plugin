@@ -23,44 +23,43 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<input type="hidden" name="tab" value="general">
 	<table class="form-table">
 		<tr>
-			<th scope="row">Enable Assist My Shop</th>
+				<th scope="row"><?php esc_html_e( 'Connection Status', 'assist-my-shop' ); ?></th>
+				<td>
+					<span id="ams-connection-indicator" class="ams-connection-indicator"></span>
+					<span id="ams-connection-status-text"><?php esc_html_e( 'Checking connection...', 'assist-my-shop' ); ?></span>
+					<p class="description"><?php esc_html_e( 'Live status of plugin connection to backend API.', 'assist-my-shop' ); ?></p>
+				</td>
+		</tr>
+		<tr>
+			<th scope="row"><?php esc_html_e( 'Enable Assist My Shop', 'assist-my-shop' ); ?></th>
 			<td>
 				<input type="checkbox" name="enabled" value="1" <?php checked( $enabled, '1' ); ?> />
-				<p class="description">Enable the AI chat widget on your store</p>
+				<p class="description"><?php esc_html_e( 'Enable the AI chat widget on your store', 'assist-my-shop' ); ?></p>
 			</td>
 		</tr>
 		<tr>
-			<th scope="row">Automatic Plugin Updates</th>
-			<td>
-				<?php $plugin_basename = plugin_basename( AMS_PATH . 'ams.php' ); ?>
-				<input type="checkbox" name="ams_auto_update" value="1" <?php checked( in_array( $plugin_basename, (array) get_option( 'auto_update_plugins', [] ) ), true ); ?> />
-				<p class="description">Enable automatic updates for Assist My Shop (uses GitHub Releases).</p>
-			</td>
-		</tr>
-		<tr>
-			<th scope="row">API Key</th>
+			<th scope="row"><?php esc_html_e( 'API Key', 'assist-my-shop' ); ?></th>
 			<td>
 				<input type="text" name="api_key" value="<?php echo esc_attr( $api_key ); ?>"
 				       class="regular-text" required/>
-				<p class="description">Your store's API key from the SaaS dashboard</p>
+				<p class="description"><?php esc_html_e( 'Your store\'s API key from the SaaS dashboard', 'assist-my-shop' ); ?></p>
 			</td>
 		</tr>
 		<tr>
-			<th scope="row">Content Types to Sync</th>
+			<th scope="row"><?php esc_html_e( 'Content Types to Sync', 'assist-my-shop' ); ?></th>
 			<td>
 				<fieldset>
-					<legend class="screen-reader-text"><span>Content Types</span></legend>
+					<legend class="screen-reader-text"><span><?php esc_html_e( 'Content Types', 'assist-my-shop' ); ?></span></legend>
 					<?php foreach ( $available_post_types as $post_type => $post_type_object ): ?>
 						<label>
-							<input type="checkbox" name="post_types[]"
-							       value="<?php echo esc_attr( $post_type ); ?>"
-								<?php checked( in_array( $post_type, $selected_post_types ) ); ?> />
-							<?php echo esc_html( $post_type_object->labels->name ); ?>
-							<span style="color: #666; font-size: 12px;">(<?php echo esc_html( $post_type ); ?>)</span>
-						</label><br>
-					<?php endforeach; ?>
-					<p class="description">Select which content types the AI should have knowledge
-						about. Products are recommended for e-commerce stores.</p>
+								<input type="checkbox" name="post_types[]"
+								       value="<?php echo esc_attr( $post_type ); ?>"
+									<?php checked( in_array( $post_type, $selected_post_types ) ); ?> />
+								<?php echo esc_html( $post_type_object->labels->name ); ?>
+								<span class="ams-post-type-code">(<?php echo esc_html( $post_type ); ?>)</span>
+							</label><br>
+						<?php endforeach; ?>
+					<p class="description"><?php esc_html_e( 'Select which content types the AI should have knowledge about. Products are recommended for e-commerce stores.', 'assist-my-shop' ); ?></p>
 				</fieldset>
 			</td>
 		</tr>
@@ -68,8 +67,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<?php submit_button(); ?>
 </form>
 
-<h2>Data Sync Status</h2>
-<p>Last sync: <?php echo esc_html( get_option( 'ams_last_sync', 'Never' ) ); ?></p>
+<h2><?php esc_html_e( 'Data Sync Status', 'assist-my-shop' ); ?></h2>
+<p>
+	<?php
+	printf(
+		'%s %s',
+		esc_html__( 'Last sync:', 'assist-my-shop' ),
+		esc_html( get_option( 'ams_last_sync', esc_html__( 'Never', 'assist-my-shop' ) ) )
+	);
+	?>
+</p>
 <?php
 $ams_batcher = null;
 $sync_progress = null;
@@ -93,7 +100,14 @@ if ( $sync_progress ) {
 	}
 	echo '<p><strong>Background sync in progress:</strong> ' . esc_html( (string) $overall_processed ) . ' of ' . esc_html( (string) $overall_total ) . ' items (' . esc_html( (string) intval( $percent ) ) . '%)</p>';
 	if ( ! empty( $sync_progress['current_post_type'] ) ) {
-		echo '<p>Currently syncing: ' . esc_html( $sync_progress['current_post_type'] ) . ' (' . esc_html( (string) intval( $sync_progress['current_processed'] ) ) . ' of ' . esc_html( (string) intval( $sync_progress['current_total'] ) ) . ')</p>';
+		echo '<p>';
+		printf(
+			esc_html__( 'Currently syncing: %1$s (%2$d of %3$d)', 'assist-my-shop' ),
+			esc_html( $sync_progress['current_post_type'] ),
+			$current_processed,
+			$current_total
+		);
+		echo '</p>';
 	}
 	echo '</div>';
 }
@@ -106,9 +120,9 @@ if ( $ams_batcher instanceof AMS_Batcher ) {
 }
 ?>
 <p>
-	<button type="button" class="button" id="ams-sync-now">Sync Now</button>
-	<span id="sync-status" style="margin-left:10px;"></span>
-</p>
+	<button type="button" class="button" id="ams-sync-now"><?php esc_html_e( 'Sync Now', 'assist-my-shop' ); ?></button>
+		<span id="sync-status" class="ams-sync-status"></span>
+	</p>
 
 <h3>Sync Queue Debug</h3>
 <p class="description">Raw queue data for debugging.</p>
@@ -121,5 +135,3 @@ if ( $ams_batcher instanceof AMS_Batcher ) {
 	<div style="background:#eee; border:1px solid #ddd; height:18px; border-radius:3px; overflow:hidden;">
 		<div id="ams-sync-progress" style="height:100%; width:0%; background:linear-gradient(90deg,#6bb9f0,#2b9cf3);"></div>
 	</div>
-	<div id="ams-sync-progress-text" style="font-size:12px; color:#333; margin-top:6px;"></div>
-</div>

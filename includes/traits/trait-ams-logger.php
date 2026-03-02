@@ -3,18 +3,25 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-
+/**
+ * Lightweight logging utility with sensitive-data redaction.
+ */
 trait Trait_AMS_Logger {
 
     /**
-     * Whether logging is enabled (option or WP_DEBUG)
+     * Determine whether logging is enabled.
+     *
+     * @return bool True when debug logging is enabled.
      */
     public static function enabled(): bool {
         return ( defined( 'WP_DEBUG' ) && WP_DEBUG ) || get_option( 'ams_debug', '0' ) === '1';
     }
 
     /**
-     * Sanitize data for logging (remove sensitive keys)
+     * Sanitize context payload before writing logs.
+     *
+     * @param mixed $data Context payload.
+     * @return mixed Sanitized context payload.
      */
     public static function sanitize_for_log( $data ) {
         if ( is_array( $data ) ) {
@@ -34,6 +41,7 @@ trait Trait_AMS_Logger {
      * @param string $message
      * @param mixed  $context
      * @param string $level
+     * @return void Writes log line when logging is enabled.
      */
     public static function log( string $message, $context = null, string $level = 'info' ): void {
         if ( ! self::enabled() ) {
@@ -87,7 +95,9 @@ trait Trait_AMS_Logger {
     }
 
     /**
-     * Return path to the plugin log file in uploads directory.
+     * Return path to plugin log file in uploads directory.
+     *
+     * @return string|null Absolute log file path or null.
      */
     private static function get_log_file_path(): ?string {
         if ( ! function_exists( 'wp_upload_dir' ) ) {

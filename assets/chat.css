@@ -94,6 +94,10 @@
     font-weight: 600;
 }
 
+#ams-chat-header .ams-chat-status-text {
+    font-size: 12px;
+}
+
 #ams-chat-close {
     background: none;
     border: none;
@@ -126,7 +130,7 @@
 .ams-message {
     display: flex;
     flex-direction: column;
-    max-width: 80%;
+    max-width: 90%;
 }
 
 .ams-message-user {
@@ -151,7 +155,9 @@
 }
 
 .ams-message-assistant .ams-message-content {
-    background: #f1f3f5;
+    border: 1px solid var(--ams-border-color);
+    background: var(--ams-background);
+    box-shadow: 0 2px 4px var(--ams-shadow-light);
     color: var(--ams-text-primary);
 }
 
@@ -272,7 +278,7 @@
         bottom: 70px;
         right: 10px;
     }
-    
+
     #ams-chat-widget {
         bottom: 15px;
         right: 15px;
@@ -286,11 +292,47 @@
         right: 10px;
         left: 10px;
     }
-    
+
     #ams-chat-toggle {
         width: 50px;
         height: 50px;
         font-size: 20px;
+    }
+
+    #ams-chat-widget .ams-product-card {
+        padding: 6px;
+    }
+
+    #ams-chat-widget .ams-product-image {
+        width: 40px;
+        height: 40px;
+        margin-right: 8px;
+    }
+
+    #ams-chat-widget .ams-product-info h4 {
+        font-size: 13px;
+    }
+
+    #ams-chat-widget .ams-product-info p {
+        font-size: 13px;
+    }
+
+    #ams-chat-widget .ams-product-actions a {
+        padding: 3px 5px;
+        font-size: 10px;
+    }
+
+    /* Adjust markdown elements for mobile */
+    #ams-chat-widget .ams-message-content h1.ams-header {
+        font-size: 16px;
+    }
+
+    #ams-chat-widget .ams-message-content h2.ams-header {
+        font-size: 15px;
+    }
+
+    #ams-chat-widget .ams-message-content h3.ams-header {
+        font-size: 14px;
     }
 }
 
@@ -362,14 +404,17 @@
 }
 
 #ams-chat-widget .ams-product-card {
-    display: flex;
-    align-items: center;
-    padding: 12px;
+    display: block;
+    padding: 10px;
     border: 1px solid var(--ams-border-color);
     border-radius: 8px;
     background: var(--ams-background);
-    box-shadow: 0 2px 4px var(--ams-shadow-light);
     transition: box-shadow 0.2s ease;
+}
+
+#ams-chat-widget .ams-product-header {
+    display: flex;
+    align-items: flex-start;
 }
 
 #ams-chat-widget .ams-product-card:hover {
@@ -377,10 +422,11 @@
 }
 
 #ams-chat-widget .ams-product-image {
-    width: 60px;
-    height: 60px;
-    margin-right: 12px;
+    width: 52px;
+    height: 52px;
+    margin-right: 10px;
     flex-shrink: 0;
+    margin-top: -3px;
 }
 
 #ams-chat-widget .ams-product-image img {
@@ -395,6 +441,7 @@
    and do not overflow the widget. Also preserve aspect ratio. */
 #ams-chat-widget .ams-message-content img {
     max-width: 100%;
+    max-height: 80px;
     height: auto;
     display: block;
     border-radius: 6px;
@@ -416,36 +463,52 @@
 
 #ams-chat-widget .ams-product-info {
     flex: 1;
+    min-width: 0;
 }
 
 #ams-chat-widget .ams-product-info h4 {
-    margin: 0 0 4px 0;
-    font-size: 16px;
+    margin: 0 0 2px 0;
+    font-size: 12px;
     color: var(--ams-text-primary);
-    font-weight: 600;
-    line-height: 1.3;
+    line-height: 1.25;
+    margin-bottom: .25rem;
 }
 
-#ams-chat-widget .ams-product-info p {
-    margin: 0 0 8px 0;
-    font-size: 18px;
-    font-weight: bold;
-    color: var(--ams-primary-color);
+ #ams-chat-widget .ams-product-info p {
+     margin: 0 0 6px 0;
+     font-size: 12px;
+     font-weight: bold;
+     color: var(--ams-primary-color);
+ }
+
+#ams-chat-widget .ams-product-actions {
+    display: flex;
+    justify-content: end;
+    flex-wrap: nowrap;
+    gap: 6px;
+    width: 100%;
+    margin-top: 8px;
 }
 
-#ams-chat-widget .ams-product-info a {
-    display: inline-block;
-    padding: 6px 12px;
-    background: linear-gradient(135deg, var(--ams-primary-gradient-start) 0%, var(--ams-primary-gradient-end) 100%);
+#ams-chat-widget .ams-product-actions a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 10px;
+    min-width: 0;
+    background-color: var(--ams-primary-gradient-start);
+    background-image: linear-gradient(135deg, var(--ams-primary-gradient-start) 0%, var(--ams-primary-gradient-end) 100%);
     color: var(--ams-primary-gradient-color);
     text-decoration: none;
     border-radius: 4px;
-    font-size: 14px;
-    transition: background 0.2s ease;
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: nowrap;
+    transition: filter 0.2s ease, opacity 0.2s ease;
 }
 
-#ams-chat-widget .ams-product-info a:hover {
-    background: var(--ams-primary-hover);
+#ams-chat-widget .ams-product-actions a:hover {
+    filter: brightness(0.92);
     text-decoration: none;
 }
 
@@ -527,45 +590,6 @@
 #ams-chat-widget .ams-message-content .ams-link:hover {
     color: var(--ams-primary-hover);
     text-decoration: none;
-}
-
-/* Mobile adjustments for product cards */
-@media (max-width: 480px) {
-    #ams-chat-widget .ams-product-card {
-        padding: 6px;
-    }
-    
-    #ams-chat-widget .ams-product-image {
-        width: 40px;
-        height: 40px;
-        margin-right: 8px;
-    }
-    
-    #ams-chat-widget .ams-product-info h4 {
-        font-size: 13px;
-    }
-    
-    #ams-chat-widget .ams-product-info p {
-        font-size: 14px;
-    }
-    
-    #ams-chat-widget .ams-product-info a {
-        padding: 3px 6px;
-        font-size: 11px;
-    }
-    
-    /* Adjust markdown elements for mobile */
-    #ams-chat-widget .ams-message-content h1.ams-header {
-        font-size: 16px;
-    }
-    
-    #ams-chat-widget .ams-message-content h2.ams-header {
-        font-size: 15px;
-    }
-    
-    #ams-chat-widget .ams-message-content h3.ams-header {
-        font-size: 14px;
-    }
 }
 
 /* Streaming-specific styles */

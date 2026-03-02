@@ -60,7 +60,7 @@ class AmsChat {
         if (container) {
             this.isOpen = !this.isOpen;
             container.style.display = this.isOpen ? 'flex' : 'none';
-            
+
             if (this.isOpen) {
                 if (this.messages.length === 0) {
                     this.addMessage('assistant', this.greetingMessage);
@@ -120,6 +120,10 @@ class AmsChat {
             nonce: '',
             streaming_enabled: false,
             store_url: window.location.origin,
+            cart_url: window.location.origin + '/cart/',
+            currency_code: 'USD',
+            currency_symbol: '$',
+            locale: undefined,
         };
     }
 
@@ -130,7 +134,7 @@ class AmsChat {
         try {
             const amsAjax = this.getAmsAjax();
             console.log('Starting streaming request to:', amsAjax.ajax_url);
-            
+
             // Use WordPress AJAX endpoint for streaming to avoid CORS issues
             const params = new URLSearchParams({
                 action: 'ams_chat_stream',
@@ -176,7 +180,7 @@ class AmsChat {
                     if (line.startsWith('data: ')) {
                         try {
                             const data = JSON.parse(line.slice(6));
-                            
+
                             if (data.type === 'session' && data.session_id) {
                                 this.sessionId = data.session_id;
                             } else if (data.type === 'token' && data.content) {
@@ -185,7 +189,7 @@ class AmsChat {
                                     this.hideStreamingTyping();
                                     assistantMessageDiv = this.createStreamingMessage();
                                 }
-                                
+
                                 fullContent += data.content;
                                 this.updateStreamingMessage(assistantMessageDiv, fullContent);
                             } else if (data.type === 'done') {
@@ -207,7 +211,7 @@ class AmsChat {
         } catch (error) {
             console.error('Streaming error:', error);
             this.hideStreamingTyping();
-            
+
             // Fallback to non-streaming if streaming fails
             console.log('Falling back to non-streaming mode...');
             this.sendMessageNonStreaming(message);
@@ -237,7 +241,10 @@ class AmsChat {
             this.hideTyping();
 
             if (data.success) {
-                this.addMessage('assistant', data.message);
+                this.addMessage('assistant', {
+                    text: data.message_text || data.message || '',
+                    products: Array.isArray(data.products) ? data.products : [],
+                });
                 if (data.session_id) {
                     this.sessionId = data.session_id;
                 }
@@ -253,20 +260,21 @@ class AmsChat {
     addMessage(type, content, messageTime = false) {
         if (!this.messagesContainer) return;
 
+        const normalizedContent = this.normalizeMessageContent(type, content);
         const messageDiv = document.createElement('div');
         messageDiv.className = `ams-message ams-message-${type}`;
-        
+
         const messageContent = document.createElement('div');
         messageContent.className = 'ams-message-content';
         // Sanitize final HTML before inserting to prevent XSS (use DOMPurify if available)
-        const rawHtml = this.formatMessageContent(content);
+        const rawHtml = this.formatMessageContent(normalizedContent.text, normalizedContent.products);
         messageContent.innerHTML = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(rawHtml) : rawHtml;
 
         const messageDate = messageTime ? new Date(messageTime) : new Date();
         const timestamp = document.createElement('div');
         timestamp.className = 'ams-message-timestamp';
         timestamp.textContent = messageDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        
+
         messageDiv.appendChild(messageContent);
         messageDiv.appendChild(timestamp);
         this.messagesContainer.appendChild(messageDiv);
@@ -274,16 +282,54 @@ class AmsChat {
         // Scroll to bottom
         this.scrollDownMessages();
 
-        this.messages.push({ type, content, timestamp: messageDate });
+        this.messages.push({
+            type,
+            content: normalizedContent.raw,
+            timestamp: messageDate,
+        });
     }
 
-    formatMessageContent(content) {
+    normalizeMessageContent(type, content) {
+        if (type !== 'assistant') {
+            return {
+                text: typeof content === 'string' ? content : '',
+                products: [],
+                raw: content,
+            };
+        }
+
+        if (content && typeof content === 'object' && !Array.isArray(content)) {
+            return {
+                text: typeof content.text === 'string' ? content.text : '',
+                products: Array.isArray(content.products) ? content.products : [],
+                raw: content,
+            };
+        }
+
+        return {
+            text: typeof content === 'string' ? content : '',
+            products: [],
+            raw: content,
+        };
+    }
+
+    formatMessageContent(content, products = []) {
+        if (Array.isArray(products) && products.length > 0) {
+            const processedText = this.formatTextContent(content || '');
+            const productsHtml = this.renderProductCards(products);
+            if (!processedText) {
+                return productsHtml;
+            }
+
+            return processedText + '<br><br>' + productsHtml;
+        }
+
         // Check if content contains HTML product cards/grids (support both
         // plugin-generated `ams-*` and server `woo-ai-*` classes) mixed with text
         const productGridRegex = /<div class="(?:ams|woo-ai)[^\"]*products?-grid"/i;
         const productCardRegex = /<div class="(?:ams|woo-ai)[^\"]*product-card"/i;
         if (productGridRegex.test(content) || productCardRegex.test(content) ||
-            (content.includes('<img src=') && content.includes('View Product'))) {
+            (content.includes('<img src=') && content.includes('View'))) {
 
             // Try to capture the trailing product HTML block (support various class prefixes)
             const htmlMatch = content.match(/(<div class="(?:(?:ams|woo-ai)[^\"]*products?-grid|(?:(?:ams|woo-ai)[^\"]*product-card))">.*?<\/div>)$/si);
@@ -307,9 +353,107 @@ class AmsChat {
         return this.formatTextContent(content);
     }
 
+    renderProductCards(products) {
+        const cards = products
+            .map((product) => this.renderProductCard(product))
+            .filter(Boolean)
+            .join('');
+
+        if (!cards) {
+            return '';
+        }
+
+        return `<div class="ams-products-grid">${cards}</div>`;
+    }
+
+    renderProductCard(product) {
+        if (!product || typeof product !== 'object') {
+            return '';
+        }
+
+        const name = this.escapeHtmlSafely(product.name || 'Unknown Product');
+        const imageUrl = this.escapeHtmlAttr(product.image_url || '');
+        const productUrl = this.escapeHtmlAttr(product.url || '#');
+        const productId = product.id;
+        const addToCartHref = product.add_to_cart_url
+            || this.buildAddToCartUrl(productId)
+            || product.url
+            || '#';
+        const addToCartUrl = this.escapeHtmlAttr(addToCartHref);
+        const price = this.formatProductPrice(product.price);
+
+        const actions = [
+            `<a href="${productUrl}" target="_blank" rel="noopener noreferrer">View</a>`,
+            `<a href="${addToCartUrl}" target="_blank" rel="noopener noreferrer">Add to Cart</a>`,
+        ]
+            .filter(Boolean)
+            .join('');
+
+        return `
+            <div class="ams-product-card">
+                <div class="ams-product-header">
+                    <div class="ams-product-image">
+                        <img src="${imageUrl}" alt="${name}">
+                    </div>
+                    <div class="ams-product-info">
+                        <h4>${name}</h4>
+                        ${price ? `<p>${price}</p>` : ''}
+                    </div>
+                </div>
+                <div class="ams-product-actions">${actions}</div>
+            </div>
+        `;
+    }
+
+    buildAddToCartUrl(productId) {
+        if (!productId || !Number.isFinite(Number(productId))) {
+            return '';
+        }
+
+        const amsAjax = this.getAmsAjax();
+        const base = String(amsAjax.cart_url || '').trim();
+        if (!base) {
+            return '';
+        }
+
+        const separator = base.includes('?') ? '&' : '?';
+        return `${base}${separator}add-to-cart=${Number(productId)}`;
+    }
+
+    formatProductPrice(price) {
+        const numericPrice = Number(price);
+        if (!Number.isFinite(numericPrice)) {
+            return '';
+        }
+
+        const amsAjax = this.getAmsAjax();
+        const currencyCode = amsAjax.currency_code || 'USD';
+        const locale = amsAjax.locale || undefined;
+
+        try {
+            return new Intl.NumberFormat(locale, {
+                style: 'currency',
+                currency: currencyCode,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }).format(numericPrice);
+        } catch (e) {
+            const symbol = amsAjax.currency_symbol || '$';
+            return `${symbol}${numericPrice.toFixed(2)}`;
+        }
+    }
+
+    escapeHtmlAttr(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
     formatTextContent(content) {
         // This method handles pure text content (no mixed HTML)
-        
+
         // First, handle literal \n characters (convert them to actual newlines)
         content = content.replace(/\\n/g, '\n');
         // Process content safely by escaping HTML first, then applying Markdown
@@ -373,7 +517,7 @@ class AmsChat {
         // Parse common Markdown syntax - work with HTML entities since text is escaped
         let parsed = text;
 
-        // Bold text: **text** or __text__ 
+        // Bold text: **text** or __text__
         // Handle both regular and HTML entity versions more reliably
         // Triple-asterisk (***text***) -> bold+italic
         parsed = parsed.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
@@ -387,7 +531,7 @@ class AmsChat {
         // Since we already processed ** above, single * should be safe for italic
         parsed = parsed.replace(/\*([^*\s][^*]*?[^*\s]?)\*/g, '<em>$1</em>');
         parsed = parsed.replace(/_([^_\s][^_]*?[^_\s]?)_/g, '<em>$1</em>');
-        
+
         // HTML entity versions for italic (single entities only)
         parsed = parsed.replace(/&#42;([^&#42;\s][^&#42;]*?[^&#42;\s]?)&#42;/g, '<em>$1</em>');
         parsed = parsed.replace(/&#95;([^&#95;\s][^&#95;]*?[^&#95;\s]?)&#95;/g, '<em>$1</em>');
@@ -404,7 +548,7 @@ class AmsChat {
         parsed = parsed.replace(/(^|<br>)### (.*?)(<br>|$)/g, '$1<h3 class="ams-header">$2</h3>$3');
         parsed = parsed.replace(/(^|<br>)## (.*?)(<br>|$)/g, '$1<h2 class="ams-header">$2</h2>$3');
         parsed = parsed.replace(/(^|<br>)# (.*?)(<br>|$)/g, '$1<h1 class="ams-header">$2</h1>$3');
-        
+
         // HTML entity versions
         parsed = parsed.replace(/(^|<br>)&#35;&#35;&#35; (.*?)(<br>|$)/g, '$1<h3 class="ams-header">$2</h3>$3');
         parsed = parsed.replace(/(^|<br>)&#35;&#35; (.*?)(<br>|$)/g, '$1<h2 class="ams-header">$2</h2>$3');
@@ -414,7 +558,7 @@ class AmsChat {
         parsed = parsed.replace(/(^|<br>)[-*] (.*?)(<br>|$)/g, '$1<li class="ams-list-item">$2</li>$3');
         parsed = parsed.replace(/(^|<br>)&#45; (.*?)(<br>|$)/g, '$1<li class="ams-list-item">$2</li>$3');
         parsed = parsed.replace(/(^|<br>)&#42; (.*?)(<br>|$)/g, '$1<li class="ams-list-item">$2</li>$3');
-        
+
         // Wrap consecutive list items in <ul>
         parsed = parsed.replace(/(<li class="ams-list-item">.*?<\/li>(?:<br>)?)+/g, (match) => {
             return '<ul class="ams-list">' + match.replace(/<br>/g, '') + '</ul>';
@@ -436,13 +580,13 @@ class AmsChat {
             'h3': ['style'],
             'h4': ['style'],
             'p': ['style'],
-            'a': ['href', 'target', 'style']
+            'a': ['href', 'target', 'rel', 'style']
         };
 
         // Function to sanitize an element
         const sanitizeElement = (element) => {
             const tagName = element.tagName.toLowerCase();
-            
+
             // Remove if not allowed tag
             if (!allowedTags.includes(tagName)) {
                 element.remove();
@@ -510,7 +654,7 @@ class AmsChat {
                 </div>
             </div>
         `;
-        
+
         this.messagesContainer.appendChild(typingDiv);
         this.scrollDownMessages()
     }
@@ -538,7 +682,7 @@ class AmsChat {
                 </div>
             </div>
         `;
-        
+
         this.messagesContainer.appendChild(typingDiv);
         this.scrollDownMessages()
     }
@@ -555,20 +699,20 @@ class AmsChat {
 
         const messageDiv = document.createElement('div');
         messageDiv.className = 'ams-message ams-message-assistant ams-streaming-message';
-        
+
         const messageContent = document.createElement('div');
         messageContent.className = 'ams-message-content ams-streaming-content';
-        
+
         const timestamp = document.createElement('div');
         timestamp.className = 'ams-message-timestamp';
         timestamp.textContent = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        
+
         // Add streaming cursor
         const cursor = document.createElement('span');
         cursor.className = 'ams-streaming-cursor';
         cursor.textContent = '▋';
         messageContent.appendChild(cursor);
-        
+
         messageDiv.appendChild(messageContent);
         messageDiv.appendChild(timestamp);
         this.messagesContainer.appendChild(messageDiv);
@@ -606,16 +750,16 @@ class AmsChat {
         // Remove streaming classes and cursor
         messageDiv.classList.remove('ams-streaming-message');
         contentDiv.classList.remove('ams-streaming-content');
-        
+
         // Set final content without cursor
         const finalHtml = this.formatMessageContent(finalContent);
         contentDiv.innerHTML = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(finalHtml) : finalHtml;
 
         // Add to messages array
-        this.messages.push({ 
-            type: 'assistant', 
-            content: finalContent, 
-            timestamp: new Date() 
+        this.messages.push({
+            type: 'assistant',
+            content: finalContent,
+            timestamp: new Date()
         });
 
         // Final scroll to bottom
@@ -662,18 +806,27 @@ class AmsChat {
                 console.log('Raw response:', responseText);
                 return;
             }
-            
+
             // Check if data exists and is valid
             if (!data) {
                 console.warn('No data received from chat history request');
                 return;
             }
-            
+
             if (data.success && data.messages && data.messages.length > 0) {
                 data.messages.forEach(msg => {
-                    if (msg && msg.type && msg.message) {
-                        this.addMessage(msg.type, msg.message, msg['created_at']);
+                    if (!msg || !msg.type) {
+                        return;
                     }
+
+                    const content = msg.type === 'assistant'
+                        ? {
+                            text: msg.message_text || msg.message || '',
+                            products: Array.isArray(msg.products) ? msg.products : [],
+                        }
+                        : (msg.message || '');
+
+                    this.addMessage(msg.type, content, msg['created_at']);
                 });
             } else if (data.success === false && data.error === 'Conversation not found') {
                 // This is normal for new sessions - no error needed

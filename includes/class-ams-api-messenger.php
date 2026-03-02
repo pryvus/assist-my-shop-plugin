@@ -1,5 +1,12 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * API communication layer for Assist My Shop SaaS backend.
+ */
 class AMS_Api_Messenger {
 
 	use Trait_AMS_Logger;
@@ -22,8 +29,22 @@ class AMS_Api_Messenger {
 	 */
 	private mixed $store_api_key;
 
+	/**
+	 * Constructor.
+	 *
+	 * @return void Initializes option-backed properties.
+	 */
 	public function __construct() {
 		$this->define_properties();
+	}
+
+	/**
+	 * Resolve effective API base URL.
+	 *
+	 * @return string API base URL.
+	 */
+	private static function get_base_url(): string {
+		return defined( 'AMS_API_BASE_URL' ) ? AMS_API_BASE_URL : self::API_BASE_URL;
 	}
 
 	/**
@@ -38,6 +59,13 @@ class AMS_Api_Messenger {
 		$this->store_api_key = get_option( 'ams_api_key', '' );
 	}
 
+	/**
+	 * Send JSON request to SaaS API endpoint.
+	 *
+	 * @param string               $endpoint API endpoint path.
+	 * @param array<string, mixed> $data     Request payload.
+	 * @return array<string, mixed> API response payload.
+	 */
 	public function send_to_saas_api( $endpoint, $data ) {
 		if ( $data ) {
 			$data['api_key'] = $this->store_api_key;
@@ -48,7 +76,7 @@ class AMS_Api_Messenger {
 		$this->log( 'Sending request to SaaS API', [ 'endpoint' => $endpoint, 'payload' => $data ], 'debug' );
 		
 
-		$response = wp_remote_post( self::API_BASE_URL . $endpoint, [
+		$response = wp_remote_post( self::get_base_url() . $endpoint, [
 			'headers' => [
 				'Content-Type' => 'application/json',
 			],
@@ -88,6 +116,13 @@ class AMS_Api_Messenger {
 		}
 	}
 
+	/**
+	 * Stream Server-Sent Events response from SaaS API.
+	 *
+	 * @param string               $endpoint API endpoint path.
+	 * @param array<string, mixed> $data     Request payload.
+	 * @return void Streams response chunks directly to output.
+	 */
 	public function stream_from_saas_api( $endpoint, $data ): void {
 		if ( $data ) {
 			$data['api_key'] = $this->store_api_key;
@@ -109,7 +144,7 @@ class AMS_Api_Messenger {
 		// Use cURL for streaming response
 		$ch = curl_init();
 
-		curl_setopt( $ch, CURLOPT_URL, self::API_BASE_URL . $endpoint );
+		curl_setopt( $ch, CURLOPT_URL, self::get_base_url() . $endpoint );
 		curl_setopt( $ch, CURLOPT_POST, true );
 		curl_setopt( $ch, CURLOPT_POSTFIELDS, wp_json_encode( $data ) );
 		curl_setopt( $ch, CURLOPT_HTTPHEADER, [
@@ -146,10 +181,20 @@ class AMS_Api_Messenger {
 		curl_close( $ch );
 	}
 
+	/**
+	 * Check whether API key is configured.
+	 *
+	 * @return bool True when API key is present.
+	 */
 	public function check_api_key(): bool {
 		return ! empty( $this->store_api_key );
 	}
 	
+	/**
+	 * Validate API credentials and store access.
+	 *
+	 * @return array<string, mixed> Connection validation result.
+	 */
 	public function validate_connection(): array {
 		if ( empty( $this->check_api_key() ) ) {
 			return [
@@ -173,6 +218,11 @@ class AMS_Api_Messenger {
 	}
 
 
+	/**
+	 * Get singleton instance.
+	 *
+	 * @return AMS_Api_Messenger Shared instance.
+	 */
 	public static function get(): AMS_Api_Messenger {
 		if ( is_null( self::$instance ) && ! ( self::$instance instanceof self ) ) {
 			self::$instance = new self();

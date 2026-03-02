@@ -3,11 +3,14 @@
  * Plugin Name: Assist My Shop
  * Plugin URI: https://assistmyshop.com
  * Description: An AI-powered customer support plugin for WooCommerce and WordPress. Provides a chat widget that integrates with your store's data to assist customers in real-time.
- * Version: 1.1.6
+ * Version: 1.1.7
  * Author: Pryvus Inc.
  * Author URI: https://pryvus.com
  * License: GPL v2 or later
+ * Text Domain: assist-my-shop
+ * Domain Path: /languages
  * Requires at least: 5.0
+ * Requires PHP: 7.4
  * Tested up to: 6.4
  *
  * @package AMS_WP
@@ -31,6 +34,7 @@ class AMS_WP_Plugin {
 	/**
 	 * Constructor.
 	 *
+	 * @return void Bootstraps plugin services and hooks.
 	 * @since 1.0.0
 	 */
 	public function __construct() {
@@ -57,17 +61,21 @@ class AMS_WP_Plugin {
 
 	/**
 	 * Handle toggle auto-update action.
+	 *
+	 * @return void Updates plugin auto-update flag and redirects back.
 	 */
 	public function handle_toggle_auto_update(): void {
 		if ( ! current_user_can( 'update_plugins' ) ) {
-			wp_die( 'Insufficient permissions' );
+			wp_die( esc_html__( 'Insufficient permissions.', 'assist-my-shop' ) );
 		}
 
-		if ( ! isset( $_REQUEST['_wpnonce'] ) || ! wp_verify_nonce( $_REQUEST['_wpnonce'], 'ams_toggle_auto_update' ) ) {
-			wp_die( 'Invalid nonce' );
+		$nonce = isset( $_REQUEST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['_wpnonce'] ) ) : '';
+		if ( empty( $nonce ) || ! wp_verify_nonce( $nonce, 'ams_toggle_auto_update' ) ) {
+			wp_die( esc_html__( 'Invalid nonce.', 'assist-my-shop' ) );
 		}
 
-		$action = isset( $_REQUEST['ams_action'] ) && $_REQUEST['ams_action'] === 'enable' ? 'enable' : 'disable';
+		$action_param = isset( $_REQUEST['ams_action'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['ams_action'] ) ) : '';
+		$action       = $action_param === 'enable' ? 'enable' : 'disable';
 
 		$plugin = plugin_basename( __FILE__ );
 		$auto_updates = (array) get_option( 'auto_update_plugins', [] );
@@ -85,11 +93,21 @@ class AMS_WP_Plugin {
 		exit;
 	}
 
+	/**
+	 * Define plugin path and URL constants.
+	 *
+	 * @return void Registers constants used across plugin classes.
+	 */
 	private function define_constants() {
 		define( 'AMS_PATH', plugin_dir_path( __FILE__ ) );
 		define( 'AMS_URL', plugin_dir_url( __FILE__ ) );
 	}
 
+	/**
+	 * Initialize admin settings page handlers.
+	 *
+	 * @return void Boots admin settings class.
+	 */
 	private function add_admin_pages(): void {
 		new AMS_Admin_Settings();
 	}
@@ -158,40 +176,42 @@ class AMS_WP_Plugin {
 		spl_autoload_register( 'ams_psr0_autoloader' );
 	}
 
+	/**
+	 * Enqueue frontend chat assets.
+	 *
+	 * @return void Loads scripts, styles and localized config.
+	 */
 	public function enqueue_scripts() {
 		if ( get_option( 'ams_enabled', '1' ) !== '1' ) {
 			return;
 		}
 
-		wp_enqueue_script(
-			'ams-chat',
-			plugin_dir_url( __FILE__ ) . 'assets/chat.js',
-			[ 'jquery', 'dompurify' ],
-			'1.1.3',
-			true
-		);
+		$chat_js  = $this->resolve_asset_path( 'assets/chat.js' );
+		$chat_css = $this->resolve_asset_path( 'assets/chat.css' );
 
-		// Enqueue DOMPurify from CDN to sanitize HTML on the client-side
-		// Register DOMPurify first (CDN), enqueue it and provide a local fallback
+		// Enqueue bundled DOMPurify (local only).
 		wp_register_script(
 			'dompurify',
-			'https://cdn.jsdelivr.net/npm/dompurify@2.4.0/dist/purify.min.js',
+			plugin_dir_url( __FILE__ ) . 'assets/vendor/dompurify.min.js',
 			[],
-			null,
+			'2.4.0',
 			true
 		);
 		wp_enqueue_script( 'dompurify' );
 
-		// Inline fallback loader: if CDN fails to load DOMPurify, load bundled fallback
-		$local_fallback = esc_url( plugin_dir_url( __FILE__ ) . 'assets/vendor/dompurify.min.js' );
-		$inline = "(function(){ if (typeof DOMPurify === 'undefined') { var s = document.createElement('script'); s.src = '" . $local_fallback . "'; s.async = false; document.head.appendChild(s); } })();";
-		wp_add_inline_script( 'dompurify', $inline );
+		wp_enqueue_script(
+			'ams-chat',
+			plugin_dir_url( __FILE__ ) . $chat_js,
+			[ 'jquery', 'dompurify' ],
+			(string) $this->get_asset_version( $chat_js ),
+			true
+		);
 
 		wp_enqueue_style(
 			'ams-chat',
-			plugin_dir_url( __FILE__ ) . 'assets/chat.css',
+			plugin_dir_url( __FILE__ ) . $chat_css,
 			[],
-			'1.1.3'
+			(string) $this->get_asset_version( $chat_css )
 		);
 
 		wp_localize_script( 'ams-chat', 'Ams', $this->get_localize_object() );
@@ -200,6 +220,11 @@ class AMS_WP_Plugin {
 		$this->add_custom_styles();
 	}
 
+	/**
+	 * Inject custom style variables for chat widget.
+	 *
+	 * @return void Adds CSS variables as inline style.
+	 */
 	private function add_custom_styles() {
 		// Get custom color values and sanitize
 		$styles = self::get_style_options();
@@ -220,25 +245,64 @@ class AMS_WP_Plugin {
 		$border_light             = sanitize_hex_color( $styles['border_light'] ?? '#ddd' );
 
 		$custom_css = ":root {" .
-			"--ams-chat-title-color: " . esc_attr( $ams_widget_title_color ) . ";" .
-			"--ams-primary-gradient-start: " . esc_attr( $primary_gradient_start ) . ";" .
-			"--ams-primary-gradient-end: " . esc_attr( $primary_gradient_end ) . ";" .
-			"--ams-primary-gradient-color: " . esc_attr( $primary_gradient_color ) . ";" .
-			"--ams-primary-color: " . esc_attr( $primary_color ) . ";" .
-			"--ams-primary-hover: " . esc_attr( $primary_hover ) . ";" .
-			"--ams-secondary-color: " . esc_attr( $secondary_color ) . ";" .
-			"--ams-text-primary: " . esc_attr( $text_primary ) . ";" .
-			"--ams-text-secondary: " . esc_attr( $text_secondary ) . ";" .
-			"--ams-text-light: " . esc_attr( $text_light ) . ";" .
-			"--ams-background: " . esc_attr( $background ) . ";" .
-			"--ams-background-light: " . esc_attr( $background_light ) . ";" .
-			"--ams-border-color: " . esc_attr( $border_color ) . ";" .
-			"--ams-border-light: " . esc_attr( $border_light ) . ";" .
-			"}";
+					  "--ams-chat-title-color: " . esc_attr( $ams_widget_title_color ) . ";" .
+					  "--ams-primary-gradient-start: " . esc_attr( $primary_gradient_start ) . ";" .
+					  "--ams-primary-gradient-end: " . esc_attr( $primary_gradient_end ) . ";" .
+					  "--ams-primary-gradient-color: " . esc_attr( $primary_gradient_color ) . ";" .
+					  "--ams-primary-color: " . esc_attr( $primary_color ) . ";" .
+					  "--ams-primary-hover: " . esc_attr( $primary_hover ) . ";" .
+					  "--ams-secondary-color: " . esc_attr( $secondary_color ) . ";" .
+					  "--ams-text-primary: " . esc_attr( $text_primary ) . ";" .
+					  "--ams-text-secondary: " . esc_attr( $text_secondary ) . ";" .
+					  "--ams-text-light: " . esc_attr( $text_light ) . ";" .
+					  "--ams-background: " . esc_attr( $background ) . ";" .
+					  "--ams-background-light: " . esc_attr( $background_light ) . ";" .
+					  "--ams-border-color: " . esc_attr( $border_color ) . ";" .
+					  "--ams-border-light: " . esc_attr( $border_light ) . ";" .
+					  "}";
 
 		wp_add_inline_style( 'ams-chat', $custom_css );
 	}
 
+	/**
+	 * Resolve asset path to minified variant in production.
+	 *
+	 * @param string $relative_path Relative asset path from plugin root.
+	 * @return string Resolved relative path.
+	 */
+	private function resolve_asset_path( string $relative_path ): string {
+		if ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) {
+			return $relative_path;
+		}
+
+		$min_path = preg_replace( '/\.(js|css)$/', '.min.$1', $relative_path );
+		if ( is_string( $min_path ) && file_exists( plugin_dir_path( __FILE__ ) . $min_path ) ) {
+			return $min_path;
+		}
+
+		return $relative_path;
+	}
+
+	/**
+	 * Compute asset version from file modification time.
+	 *
+	 * @param string $relative_path Relative asset path from plugin root.
+	 * @return int Asset version value.
+	 */
+	private function get_asset_version( string $relative_path ): int {
+		$full_path = plugin_dir_path( __FILE__ ) . $relative_path;
+		if ( file_exists( $full_path ) ) {
+			return (int) filemtime( $full_path );
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Get currently saved style options.
+	 *
+	 * @return array<string, string> Style option map.
+	 */
 	public static function get_style_options(): array {
 		return [
 			'ams_widget_title_color' 	=> get_option( 'ams_widget_title_color', '#ffffff' ),
@@ -258,13 +322,26 @@ class AMS_WP_Plugin {
 		];
 	}
 
+	/**
+	 * Build localized frontend configuration payload.
+	 *
+	 * @return array<string, mixed> Localized data structure for JS.
+	 */
 	private function get_localize_object(): array {
+		$currency_code   = function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : 'USD';
+		$currency_symbol = function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol( $currency_code ) : '$';
+		$cart_url        = function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : home_url( '/cart/' );
+
 		return [
 			'AmsAjax'     => [
 				'ajax_url'          => admin_url( 'admin-ajax.php' ),
 				'nonce'             => wp_create_nonce( 'ams_chat' ),
 				'store_url'         => home_url(),
 				'streaming_enabled' => false, // Disabled for OpenAI, only Ollama supports streaming
+				'cart_url'          => $cart_url,
+				'currency_code'     => $currency_code,
+				'currency_symbol'   => $currency_symbol,
+				'locale'            => str_replace( '_', '-', get_locale() ),
 			],
 			'assistantName' => get_option( 'ams_assistant_name', '' ),
 		];
