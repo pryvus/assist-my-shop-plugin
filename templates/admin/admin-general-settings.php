@@ -123,7 +123,7 @@ if ( $ams_batcher instanceof AMS_Batcher ) {
 	<button type="button" class="button" id="ams-sync-now"><?php esc_html_e( 'Sync Now', 'assist-my-shop' ); ?></button>
 		<span id="sync-status" class="ams-sync-status"></span>
 	</p>
-
+<?php  if (defined( 'WP_DEBUG' ) && WP_DEBUG ) : ?>
 <h3>Sync Queue Debug</h3>
 <p class="description">Raw queue data for debugging.</p>
 <p><strong>Active job:</strong></p>
@@ -135,3 +135,5 @@ if ( $ams_batcher instanceof AMS_Batcher ) {
 	<div style="background:#eee; border:1px solid #ddd; height:18px; border-radius:3px; overflow:hidden;">
 		<div id="ams-sync-progress" style="height:100%; width:0%; background:linear-gradient(90deg,#6bb9f0,#2b9cf3);"></div>
 	</div>
+</div>
+<?php endif; ?>
