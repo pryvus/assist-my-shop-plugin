@@ -122,8 +122,8 @@ trait Trait_AMS_Data_Privacy
     private function has_privacy_consent($order, array $regulations): bool
     {
         // Use Consent Manager to detect consent from various plugins
-        $consent_manager = AMS_Consent_Manager::get_instance();
-        return $consent_manager->detect_consent($order);
+        $privacy_manager = AMS_Privacy::get_instance();
+        return $privacy_manager->detect_consent($order);
     }
 
     /**
@@ -160,7 +160,7 @@ trait Trait_AMS_Data_Privacy
         $store_country = WC()->countries->get_base_country();
         $regulations = $this->get_applicable_regulations($store_country, $order->get_billing_country());
         
-        $consent_manager = AMS_Consent_Manager::get_instance();
+        $consent_manager = AMS_Privacy::get_instance();
         $consent_info = $consent_manager->get_consent_info($order);
 
         return [

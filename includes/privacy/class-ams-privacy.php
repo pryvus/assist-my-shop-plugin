@@ -6,7 +6,7 @@
  * Orchestrates consent detection across multiple cookie consent plugins
  * Uses adapter pattern to support Complianz, CookieYes, and Moove
  */
-class AMS_Consent_Manager
+class AMS_Privacy
 {
     /**
      * Singleton instance
@@ -20,9 +20,9 @@ class AMS_Consent_Manager
 
     /**
      * Get singleton instance
-     * @return AMS_Consent_Manager
+     * @return AMS_Privacy
      */
-    public static function get_instance(): AMS_Consent_Manager
+    public static function get_instance(): AMS_Privacy
     {
         if (self::$instance === null) {
             self::$instance = new self();

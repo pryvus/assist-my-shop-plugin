@@ -1,0 +1,11 @@
+{
+  "name": "assist-my-shop/assist-my-shop-plugin",
+  "description": "Assist My Shop plugin test dependencies",
+  "type": "project",
+  "require-dev": {
+    "phpunit/phpunit": "^9.6"
+  },
+  "scripts": {
+    "test": "phpunit -c phpunit.xml.dist"
+  }
+}

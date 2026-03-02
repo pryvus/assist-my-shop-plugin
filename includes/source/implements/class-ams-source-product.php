@@ -1,6 +1,6 @@
 <?php
 
-class AMS_WC_Product_Source implements AMS_Source_Impl_Interface
+class AMS_Source_Product implements AMS_Source_Interface
 {
     /**
      * Get total count of items in the source
@@ -14,6 +14,16 @@ class AMS_WC_Product_Source implements AMS_Source_Impl_Interface
         ]);
         $product_ids = $this->prepare_ids($orders);
         return count($product_ids);
+    }
+
+    public function get_item_ids(): array
+    {
+        $products = wc_get_products([
+            'limit' => -1,
+            'return' => 'ids',
+        ]);
+
+        return array_values(array_map('intval', $this->prepare_ids($products)));
     }
 
     /**
@@ -59,6 +69,22 @@ class AMS_WC_Product_Source implements AMS_Source_Impl_Interface
             'attributes'        => $this->get_product_attributes($id),
             'type'              => 'product',
         ];
+    }
+
+    public function get_items_by_ids(array $ids): array
+    {
+        $ids = array_values(array_filter(array_map('intval', $ids), static fn($id) => $id > 0));
+        if (empty($ids)) {
+            return [];
+        }
+
+        $products = wc_get_products([
+            'include' => $ids,
+            'limit'   => count($ids),
+            'return'  => 'ids',
+        ]);
+
+        return $this->get_formatted_products((array) $products);
     }
 
     /**

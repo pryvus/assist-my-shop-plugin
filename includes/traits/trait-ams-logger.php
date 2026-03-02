@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-trait AMS_Logger {
+trait Trait_AMS_Logger {
 
     /**
      * Whether logging is enabled (option or WP_DEBUG)

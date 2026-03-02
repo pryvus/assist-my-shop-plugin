@@ -2,6 +2,8 @@
 
 class AMS_Api_Messenger {
 
+	use Trait_AMS_Logger;
+
 	private static ?AMS_Api_Messenger $instance = null;
 
 	/**
@@ -42,9 +44,9 @@ class AMS_Api_Messenger {
 		}
 
 		// Don't log raw data with api_key; use logger which redacts sensitive fields
-		if ( class_exists( 'AMS_Logger' ) ) {
-			AMS_Logger::log( 'Sending request to SaaS API', [ 'endpoint' => $endpoint, 'payload' => $data ], 'debug' );
-		}
+	
+		$this->log( 'Sending request to SaaS API', [ 'endpoint' => $endpoint, 'payload' => $data ], 'debug' );
+		
 
 		$response = wp_remote_post( self::API_BASE_URL . $endpoint, [
 			'headers' => [
@@ -55,17 +57,15 @@ class AMS_Api_Messenger {
 		] );
 
 		if ( is_wp_error( $response ) ) {
-			if ( class_exists( 'AMS_Logger' ) ) {
-				AMS_Logger::log( 'wp_remote_post error', $response->get_error_message(), 'error' );
-			}
+			
+			$this->log( 'wp_remote_post error', $response->get_error_message(), 'error' );
+			
 			return [ 'success' => false, 'error' => $response->get_error_message() ];
 		}
 
 		$code = (int) wp_remote_retrieve_response_code( $response );
 		$body = wp_remote_retrieve_body( $response );
-		if ( class_exists( 'AMS_Logger' ) ) {
-			AMS_Logger::log( 'SaaS API response', [ 'endpoint' => $endpoint, 'code' => $code, 'body' => $body ], 'debug' );
-		}
+		$this->log( 'SaaS API response', [ 'endpoint' => $endpoint, 'code' => $code, 'body' => $body ], 'debug' );
 
 		// Treat any 2xx as success
 		if ( $code >= 200 && $code < 300 ) {
@@ -102,8 +102,8 @@ class AMS_Api_Messenger {
 			return;
 		}
 
-		if ( class_exists( 'AMS_Logger' ) ) {
-			AMS_Logger::log( 'Starting cURL stream to SaaS API', [ 'endpoint' => $endpoint ], 'debug' );
+		if ( class_exists( 'Trait_AMS_Logger' ) ) {
+			Trait_AMS_Logger::log( 'Starting cURL stream to SaaS API', [ 'endpoint' => $endpoint ], 'debug' );
 		}
 
 		// Use cURL for streaming response
@@ -138,9 +138,7 @@ class AMS_Api_Messenger {
 		curl_exec( $ch );
 
 		if ( curl_error( $ch ) ) {
-			if ( class_exists( 'AMS_Logger' ) ) {
-				AMS_Logger::log( 'cURL streaming error', curl_error( $ch ), 'error' );
-			}
+			$this->log( 'cURL streaming error', curl_error( $ch ), 'error' );
 			echo "data: " . json_encode( [ 'error' => 'Connection error: ' . curl_error( $ch ) ] ) . "\n\n";
 			flush();
 		}

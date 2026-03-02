@@ -1,7 +1,7 @@
 <?php
 
 
-class AMS_WP_Post_Source implements AMS_Source_Impl_Interface
+class AMS_Source_Post implements AMS_Source_Interface
 {
 
     private string $post_type = 'post';
@@ -21,6 +21,20 @@ class AMS_WP_Post_Source implements AMS_Source_Impl_Interface
 
         $query = new WP_Query($args);
         return (int) $query->found_posts;
+    }
+
+    public function get_item_ids(): array
+    {
+        $args = [
+            'post_type'      => $this->post_type,
+            'post_status'    => 'publish',
+            'fields'         => 'ids',
+            'posts_per_page' => -1,
+            'no_found_rows'  => true,
+        ];
+
+        $query = new WP_Query($args);
+        return array_values(array_map('intval', (array) $query->posts));
     }
 
 
@@ -57,6 +71,35 @@ class AMS_WP_Post_Source implements AMS_Source_Impl_Interface
     public function get_item_by_id(int $id): array | null
     {
         return $this->get_post_data($id);
+    }
+
+    public function get_items_by_ids(array $ids): array
+    {
+        $ids = array_values(array_filter(array_map('intval', $ids), static fn($id) => $id > 0));
+        if (empty($ids)) {
+            return [];
+        }
+
+        $args = [
+            'post_type'      => $this->post_type,
+            'post_status'    => 'publish',
+            'fields'         => 'ids',
+            'post__in'       => $ids,
+            'posts_per_page' => count($ids),
+            'orderby'        => 'post__in',
+            'no_found_rows'  => true,
+        ];
+
+        $query = new WP_Query($args);
+        $posts_data = [];
+        foreach ((array) $query->posts as $pid) {
+            $post_data = $this->get_post_data((int) $pid);
+            if ($post_data) {
+                $posts_data[] = $post_data;
+            }
+        }
+
+        return $posts_data;
     }
 
     /**

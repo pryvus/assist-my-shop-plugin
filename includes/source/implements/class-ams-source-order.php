@@ -10,7 +10,7 @@
  * - LGPD (Brazil)
  * - PIPEDA (Canada)
  */
-class AMS_WC_Order_Source implements AMS_Source_Impl_Interface
+class AMS_Source_Order implements AMS_Source_Interface
 {
     use Trait_AMS_Data_Privacy;
     /**
@@ -24,6 +24,16 @@ class AMS_WC_Order_Source implements AMS_Source_Impl_Interface
             'return' => 'ids',
         ]);
         return is_array($orders) ? count($orders) : 0;
+    }
+
+    public function get_item_ids(): array
+    {
+        $orders = wc_get_orders([
+            'limit' => -1,
+            'return' => 'ids',
+        ]);
+
+        return array_values(array_map('intval', is_array($orders) ? $orders : []));
     }
 
     /**
@@ -78,6 +88,22 @@ class AMS_WC_Order_Source implements AMS_Source_Impl_Interface
         }
 
         return $order_data;
+    }
+
+    public function get_items_by_ids(array $ids): array
+    {
+        $ids = array_values(array_filter(array_map('intval', $ids), static fn($id) => $id > 0));
+        if (empty($ids)) {
+            return [];
+        }
+
+        $orders = wc_get_orders([
+            'include' => $ids,
+            'limit'   => count($ids),
+            'return'  => 'ids',
+        ]);
+
+        return $this->get_formatted_orders(is_array($orders) ? $orders : []);
     }
 
     /**

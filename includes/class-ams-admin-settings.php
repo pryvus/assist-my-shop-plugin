@@ -182,14 +182,7 @@ class AMS_Admin_Settings {
 
             echo '<div class="notice notice-success"><p>Settings saved! Store sync has been scheduled in the background.</p></div>';
 
-            // Schedule immediate background sync instead of blocking sync
-            AMS_Sync_Handler::get()->schedule_immediate_sync();
         }
-    }
-
-    private function output_text_field( string $field_name ): void {
-        $field_value = esc_html( get_option( $field_name, '' ) );
-        echo "<input type='text' name='$field_name' id='$field_name' value='$field_value'>";
     }
 
     private function set_global_styling_options(): void {
