@@ -78,24 +78,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 	?>
 </p>
 <?php
-$sync_progress = get_option( 'ams_sync_progress', null );
+$ams_batcher = null;
+$sync_progress = null;
+if ( class_exists( 'AMS_Batcher' ) ) {
+	$ams_batcher = new AMS_Batcher();
+	$sync_progress = $ams_batcher->get_sync_progress_snapshot();
+}
+
+if ( ! $sync_progress ) {
+	$sync_progress = get_option( 'ams_sync_progress', null );
+}
+
 if ( $sync_progress ) {
-	$overall_total     = (int) $sync_progress['overall_total'];
-	$overall_processed = (int) $sync_progress['overall_processed'];
-	$current_processed = (int) $sync_progress['current_processed'];
-	$current_total     = (int) $sync_progress['current_total'];
-	$percent           = $overall_total > 0 ? (int) round( ( $overall_processed / $overall_total ) * 100 ) : 0;
-
+	$overall_total = (int) ( $sync_progress['overall_total'] ?? 0 );
+	$overall_processed = (int) ( $sync_progress['overall_processed'] ?? 0 );
+	$percent = $overall_total > 0 ? round( ( $overall_processed / $overall_total ) * 100 ) : 0;
+	$status = (string) ( $sync_progress['status'] ?? 'in_progress' );
 	echo '<div class="notice notice-info inline">';
-	echo '<p><strong>' . esc_html__( 'Background sync in progress:', 'assist-my-shop' ) . '</strong> ';
-	printf(
-		esc_html__( '%1$d of %2$d items (%3$d%%)', 'assist-my-shop' ),
-		$overall_processed,
-		$overall_total,
-		$percent
-	);
-	echo '</p>';
-
+	if ( $status === 'queued' ) {
+		echo '<p><strong>Background sync queued.</strong> Waiting for worker...</p>';
+	}
+	echo '<p><strong>Background sync in progress:</strong> ' . esc_html( (string) $overall_processed ) . ' of ' . esc_html( (string) $overall_total ) . ' items (' . esc_html( (string) intval( $percent ) ) . '%)</p>';
 	if ( ! empty( $sync_progress['current_post_type'] ) ) {
 		echo '<p>';
 		printf(
@@ -108,15 +111,29 @@ if ( $sync_progress ) {
 	}
 	echo '</div>';
 }
+
+$debug_active_job = [];
+$debug_queue_items = [];
+if ( $ams_batcher instanceof AMS_Batcher ) {
+	$debug_active_job = $ams_batcher->get_active_job();
+	$debug_queue_items = $ams_batcher->get_queue_items();
+}
 ?>
 <p>
 	<button type="button" class="button" id="ams-sync-now"><?php esc_html_e( 'Sync Now', 'assist-my-shop' ); ?></button>
 		<span id="sync-status" class="ams-sync-status"></span>
 	</p>
+<?php  if (defined( 'WP_DEBUG' ) && WP_DEBUG ) : ?>
+<h3>Sync Queue Debug</h3>
+<p class="description">Raw queue data for debugging.</p>
+<p><strong>Active job:</strong></p>
+<pre style="max-height:220px; overflow:auto; background:#f6f7f7; border:1px solid #dcdcde; padding:10px;"><?php echo esc_html( wp_json_encode( $debug_active_job, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) ?: '{}' ); ?></pre>
+<p><strong>Queued requests:</strong></p>
+<pre style="max-height:260px; overflow:auto; background:#f6f7f7; border:1px solid #dcdcde; padding:10px;"><?php echo esc_html( wp_json_encode( $debug_queue_items, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) ?: '[]' ); ?></pre>
 
-	<div id="ams-sync-progress-container" class="ams-sync-progress-container">
-		<div class="ams-sync-progress-track">
-			<div id="ams-sync-progress" class="ams-sync-progress-bar"></div>
-		</div>
-		<div id="ams-sync-progress-text" class="ams-sync-progress-text"></div>
+<div id="ams-sync-progress-container" style="display:none; margin-top:10px; max-width:480px;">
+	<div style="background:#eee; border:1px solid #ddd; height:18px; border-radius:3px; overflow:hidden;">
+		<div id="ams-sync-progress" style="height:100%; width:0%; background:linear-gradient(90deg,#6bb9f0,#2b9cf3);"></div>
 	</div>
+</div>
+<?php endif; ?>

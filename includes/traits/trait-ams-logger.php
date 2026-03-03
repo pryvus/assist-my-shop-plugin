@@ -3,11 +3,10 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-
 /**
  * Lightweight logging utility with sensitive-data redaction.
  */
-class AMS_Logger {
+trait Trait_AMS_Logger {
 
     /**
      * Determine whether logging is enabled.
@@ -111,4 +110,5 @@ class AMS_Logger {
         $dir = trailingslashit( $uploads['basedir'] ) . 'ams-logs';
         return $dir . DIRECTORY_SEPARATOR . 'ams.log';
     }
+
 }

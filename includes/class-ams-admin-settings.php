@@ -297,22 +297,8 @@ class AMS_Admin_Settings {
 
             echo '<div class="notice notice-success"><p>' . esc_html__( 'Settings saved! Store sync has been scheduled in the background.', 'assist-my-shop' ) . '</p></div>';
 
-            // Schedule immediate background sync instead of blocking sync
-            AMS_Sync_Handler::get()->schedule_immediate_sync();
         }
     }
-
-    /**
-     * Render plain text settings field.
-     *
-     * @param string $field_name Option key used as field name and id.
-     * @return void Outputs text input HTML.
-     */
-    private function output_text_field( string $field_name ): void {
-        $field_value = esc_html( get_option( $field_name, '' ) );
-        echo "<input type='text' name='$field_name' id='$field_name' value='$field_value'>";
-    }
-
     /**
      * Register styling option names and sanitizers.
      *

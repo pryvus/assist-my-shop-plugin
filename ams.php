@@ -3,7 +3,7 @@
  * Plugin Name: Assist My Shop
  * Plugin URI: https://assistmyshop.com
  * Description: An AI-powered customer support plugin for WooCommerce and WordPress. Provides a chat widget that integrates with your store's data to assist customers in real-time.
- * Version: 1.1.7
+ * Version: 1.1.8
  * Author: Pryvus Inc.
  * Author URI: https://pryvus.com
  * License: GPL v2 or later
@@ -38,11 +38,11 @@ class AMS_WP_Plugin {
 	 * @since 1.0.0
 	 */
 	public function __construct() {
-		$this->load_classes();
 		$this->define_constants();
-
+		$this->load_classes();
 		// Load plugin translations
 		load_plugin_textdomain( 'assist-my-shop', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+		// Initialize components
 		$this->bootstrap_frontend();
 		$this->integrate_chat();
 		$this->manage_sync();
@@ -135,13 +135,7 @@ class AMS_WP_Plugin {
 	 * @since  1.0.0
 	 */
 	private function manage_sync(): void {
-		// Check if WooCommerce is active
-		if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ) ) ) {
-			// WooCommerce hooks for data sync
-			AMS_WC_Sync::init();
-		}
-
-		AMS_Sync_Handler::init();
+		AMS_Sync::init();
 	}
 
 	/**
@@ -159,29 +153,27 @@ class AMS_WP_Plugin {
 	/**
 	 * Register class autoloader.
 	 *
-	 * Sets up SPL autoloader to automatically load plugin classes from
-	 * the includes directory following WordPress naming conventions.
+	 * Sets up SPL autoloader to automatically load plugin classes, traits and interfaces
+	 * from the includes directory following WordPress naming conventions.
+	 * Supports nested directory structures.
 	 *
 	 * @return void
 	 * @since  1.0.0
 	 */
 	private function load_classes(): void {
-		spl_autoload_register( function ( $class ) {
-			// Common classes directory
-			$class_basedir = plugin_dir_path( __FILE__ ) . 'includes' . DIRECTORY_SEPARATOR;
-			// Format full class name to map corresponding file name
-			$class_name_parts                = explode( '\\', $class );
-			$class_name                      = count( $class_name_parts ) - 1;
-			$class_name_parts[ $class_name ] = 'class-' . strtolower( $class_name_parts[ $class_name ] );
-			$class_name                      = implode( '\\', $class_name_parts );
-			$class_name                      = str_replace( '\\', DIRECTORY_SEPARATOR, $class_name );
-			$class_name                      = str_replace( '_', '-', $class_name );
-
-			$class_filename = $class_basedir . $class_name . '.php';
-			if ( file_exists( $class_filename ) ) {
-				require_once $class_filename;
+		// Preload trait files so traits are available when classes reference them
+		$basedir = plugin_dir_path( __FILE__ ) . 'includes' . DIRECTORY_SEPARATOR;
+		$trait_dir = $basedir . 'traits' . DIRECTORY_SEPARATOR;
+		if ( is_dir( $trait_dir ) ) {
+			foreach ( glob( $trait_dir . 'trait-*.php' ) as $trait_file ) {
+				require_once $trait_file;
 			}
-		} );
+		}
+
+		if ( ! function_exists( 'ams_psr0_autoloader' ) ) {
+			require_once plugin_dir_path( __FILE__ ) . 'psr0.php';
+		}
+		spl_autoload_register( 'ams_psr0_autoloader' );
 	}
 
 	/**
