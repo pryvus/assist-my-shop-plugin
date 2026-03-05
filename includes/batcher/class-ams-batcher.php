@@ -45,7 +45,7 @@ class AMS_Batcher {
 		$request_data['type_totals'] = $this->resolve_type_totals_for_request( $request_data, $types, $type_totals );
 
 		$request_id = $this->queue->enqueue( $request_data );
-		wp_schedule_single_event( time() + 5, 'ams_sync_process_queue' );
+		AMS_Sync_Scheduler::schedule_single_queue_run( 5 );
 		return $request_id;
 	}
 
@@ -106,7 +106,7 @@ class AMS_Batcher {
 
 		$pending = $this->get_queue_size();
 		if ( $pending > 0 ) {
-			wp_schedule_single_event( time() + 5, 'ams_sync_process_queue' );
+			AMS_Sync_Scheduler::schedule_single_queue_run( 5 );
 		}
 
 		$result['pending_queue_count'] = $pending;

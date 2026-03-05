@@ -92,6 +92,8 @@ if ( ! $sync_progress ) {
 if ( $sync_progress ) {
 	$overall_total = (int) ( $sync_progress['overall_total'] ?? 0 );
 	$overall_processed = (int) ( $sync_progress['overall_processed'] ?? 0 );
+	$current_total = (int) ( $sync_progress['current_total'] ?? 0 );
+	$current_processed = (int) ( $sync_progress['current_processed'] ?? 0 );
 	$percent = $overall_total > 0 ? round( ( $overall_processed / $overall_total ) * 100 ) : 0;
 	$status = (string) ( $sync_progress['status'] ?? 'in_progress' );
 	echo '<div class="notice notice-info inline">';

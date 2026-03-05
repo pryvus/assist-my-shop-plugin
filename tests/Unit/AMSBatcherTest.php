@@ -90,8 +90,12 @@ final class AMSBatcherTest extends TestCase {
 		$this->assertGreaterThanOrEqual( $before + 30, (int) $requeued['next_run_at'] );
 		$this->assertLessThanOrEqual( $after + 30, (int) $requeued['next_run_at'] );
 
-		$this->assertCount( 1, $GLOBALS['ams_test_wp_scheduled_events'] );
-		$this->assertSame( 'ams_sync_process_queue', $GLOBALS['ams_test_wp_scheduled_events'][0]['hook'] );
+		$this->assertNotEmpty( $GLOBALS['ams_test_wp_scheduled_events'] );
+		$hooks = array_map(
+			static fn ( array $event ): string => (string) ( $event['hook'] ?? '' ),
+			$GLOBALS['ams_test_wp_scheduled_events']
+		);
+		$this->assertContains( 'ams_sync_process_queue', $hooks );
 	}
 
 	public function test_do_batch_sends_expected_saas_payload_structure(): void {

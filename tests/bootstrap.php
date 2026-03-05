@@ -43,6 +43,52 @@ if ( ! function_exists( 'wp_schedule_single_event' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_schedule_event' ) ) {
+	function wp_schedule_event( int $timestamp, string $recurrence, string $hook, array $args = [] ): bool {
+		$GLOBALS['ams_test_wp_scheduled_events'][] = [
+			'timestamp'  => $timestamp,
+			'recurrence' => $recurrence,
+			'hook'       => $hook,
+			'args'       => $args,
+		];
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_next_scheduled' ) ) {
+	function wp_next_scheduled( string $hook, array $args = [] ) {
+		foreach ( $GLOBALS['ams_test_wp_scheduled_events'] as $event ) {
+			if ( ( $event['hook'] ?? '' ) !== $hook ) {
+				continue;
+			}
+
+			$event_args = $event['args'] ?? [];
+			if ( $event_args === $args ) {
+				return (int) ( $event['timestamp'] ?? time() );
+			}
+		}
+
+		return false;
+	}
+}
+
+if ( ! function_exists( 'wp_clear_scheduled_hook' ) ) {
+	function wp_clear_scheduled_hook( string $hook, array $args = [] ): bool {
+		$remaining = [];
+		foreach ( $GLOBALS['ams_test_wp_scheduled_events'] as $event ) {
+			$event_hook = $event['hook'] ?? '';
+			$event_args = $event['args'] ?? [];
+			if ( $event_hook === $hook && $event_args === $args ) {
+				continue;
+			}
+			$remaining[] = $event;
+		}
+
+		$GLOBALS['ams_test_wp_scheduled_events'] = $remaining;
+		return true;
+	}
+}
+
 if ( ! function_exists( 'home_url' ) ) {
 	function home_url(): string {
 		return 'https://example.test';
@@ -243,4 +289,12 @@ if ( ! class_exists( 'AMS_Batcher_WP' ) ) {
 	}
 }
 
+require_once __DIR__ . '/../includes/traits/trait-ams-logger.php';
+$scheduler_root = __DIR__ . '/../includes/sync/class-ams-sync-scheduler.php';
+$scheduler_impl = __DIR__ . '/../includes/sync/implements/class-ams-sync-scheduler.php';
+if ( file_exists( $scheduler_root ) ) {
+	require_once $scheduler_root;
+} elseif ( file_exists( $scheduler_impl ) ) {
+	require_once $scheduler_impl;
+}
 require_once __DIR__ . '/../includes/batcher/class-ams-batcher.php';

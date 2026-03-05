@@ -34,12 +34,12 @@ function ams_load_class_or_inetrface($class, $basedir)
                 require_once $impl_file;
                 return true;
             }
-        } else {
-            $sub_class = $basedir . strtolower($sub) . DIRECTORY_SEPARATOR . "class-ams-$filename_base.php";
-            if (file_exists($sub_class)) {
-                require_once $sub_class;
-                return true;
-            }
+        }
+
+        $sub_class = $basedir . strtolower($sub) . DIRECTORY_SEPARATOR . "class-ams-$filename_base.php";
+        if (file_exists($sub_class)) {
+            require_once $sub_class;
+            return true;
         }
     } 
     elseif ($implemnt === 'Interface') {
