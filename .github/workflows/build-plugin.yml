@@ -21,10 +21,24 @@ jobs:
         run: |
           set -e
           PLUGIN_DIR="."
+          PLUGIN_SLUG="assist-my-shop-plugin"
+          BUILD_DIR="$(mktemp -d)"
+          PACKAGE_DIR="$BUILD_DIR/$PLUGIN_SLUG"
+          trap 'rm -rf "$BUILD_DIR"' EXIT
+
+          mkdir -p "$PACKAGE_DIR"
+          rsync -a \
+            --exclude ".git/" \
+            --exclude ".github/" \
+            --exclude "node_modules/" \
+            --exclude "*.DS_Store" \
+            --exclude "*.zip" \
+            "$PLUGIN_DIR/" "$PACKAGE_DIR/"
+
           # Compile translations: generate .mo files from .po sources if msgfmt is available
           if command -v msgfmt >/dev/null 2>&1; then
             echo "Compiling .po -> .mo files"
-            find "$PLUGIN_DIR" -path "*/languages/*.po" -print0 | while IFS= read -r -d '' PO; do
+            find "$PACKAGE_DIR" -path "*/languages/*.po" -print0 | while IFS= read -r -d '' PO; do
               MO="${PO%.po}.mo"
               echo "  $PO -> $MO"
               msgfmt "$PO" -o "$MO" || true
@@ -42,8 +56,7 @@ jobs:
             VERSION="${{ github.run_id }}"
           fi
           ZIP_NAME="assist-my-shop-plugin-${VERSION}.zip"
-          # Exclude common dev files and VCS (exclude top-level .git as well)
-          zip -r "$ZIP_NAME" "$PLUGIN_DIR" -x "*/node_modules/*" ".git/*" "*/.git/*" "*.DS_Store" || true
+          (cd "$BUILD_DIR" && zip -r "$GITHUB_WORKSPACE/$ZIP_NAME" "$PLUGIN_SLUG" -x "*/node_modules/*" "*.DS_Store")
           echo "Created $ZIP_NAME"
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_OUTPUT
           # Export parsed version for later steps

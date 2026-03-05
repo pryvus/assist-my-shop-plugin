@@ -3,7 +3,7 @@
  * Plugin Name: Assist My Shop
  * Plugin URI: https://assistmyshop.com
  * Description: An AI-powered customer support plugin for WooCommerce and WordPress. Provides a chat widget that integrates with your store's data to assist customers in real-time.
- * Version: 1.1.8
+ * Version: 1.1.9
  * Author: Pryvus Inc.
  * Author URI: https://pryvus.com
  * License: GPL v2 or later
