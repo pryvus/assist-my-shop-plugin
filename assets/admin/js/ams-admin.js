@@ -38,8 +38,21 @@
 
     let pollHandle = null;
     function pollProgressUntilDone(onDone) {
-        if (pollHandle) clearInterval(pollHandle);
-        pollHandle = setInterval(() => {
+        if (pollHandle) clearTimeout(pollHandle);
+
+        const getQueueState = (payload) => {
+            const queue = payload && payload.queue ? payload.queue : {};
+            const size = Number(queue.size || 0);
+            const activeJob = queue.active_job && typeof queue.active_job === 'object' ? queue.active_job : null;
+            const hasActiveJob = !!(activeJob && Object.keys(activeJob).length > 0);
+            return { size, hasActiveJob };
+        };
+
+        const scheduleNextPoll = (delayMs) => {
+            pollHandle = setTimeout(runPoll, delayMs);
+        };
+
+        const runPoll = () => {
             fetch(ajaxUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -49,25 +62,36 @@
                 .then(d => {
                     if (!d.success) {
                         setStatus(t('failed_fetch_progress', 'Failed to fetch progress'));
-                        clearInterval(pollHandle);
+                        clearTimeout(pollHandle);
                         return;
                     }
+
                     const progress = d.progress;
+                    const queueState = getQueueState(d);
                     if (progress) {
                         updateProgress(progress);
                         setStatus(t('sync_in_progress', 'Sync in progress...'));
+                        scheduleNextPoll(5000);
+                        return;
+                    }
+
+                    if (queueState.size > 0 || queueState.hasActiveJob) {
+                        setStatus(t('sync_queued_waiting', 'Background sync queued — waiting for worker...'));
+                        scheduleNextPoll(5000);
                     } else {
                         updateProgress(null);
                         setStatus(t('sync_complete', 'Sync complete — last sync:') + ' ' + (d.last_sync || t('unknown', 'Unknown')));
-                        clearInterval(pollHandle);
+                        clearTimeout(pollHandle);
                         if (typeof onDone === 'function') onDone();
                     }
                 })
                 .catch(() => {
                     setStatus(t('error_polling', 'Error polling sync progress'));
-                    clearInterval(pollHandle);
+                    clearTimeout(pollHandle);
                 });
-        }, 2000);
+        };
+
+        runPoll();
     }
 
     function updateConnectionUI(connected, message) {

@@ -35,14 +35,9 @@ class AMS_Batcher {
 
 	public function enqueue_request( AMS_Sync_Request $request ): string {
 		$request_data = $request->to_array();
-		$types = isset( $request_data['types'] ) && is_array( $request_data['types'] )
-			? array_values( array_filter( $request_data['types'], 'is_string' ) )
-			: [];
-		$type_totals = isset( $request_data['type_totals'] ) && is_array( $request_data['type_totals'] )
+		$request_data['type_totals'] = isset( $request_data['type_totals'] ) && is_array( $request_data['type_totals'] )
 			? $request_data['type_totals']
 			: [];
-
-		$request_data['type_totals'] = $this->resolve_type_totals_for_request( $request_data, $types, $type_totals );
 
 		$request_id = $this->queue->enqueue( $request_data );
 		AMS_Sync_Scheduler::schedule_single_queue_run( 5 );
@@ -411,7 +406,7 @@ class AMS_Batcher {
 		$type_totals = isset( $request['type_totals'] ) && is_array( $request['type_totals'] )
 			? $request['type_totals']
 			: [];
-		$type_totals = $this->resolve_type_totals_for_request( $request, $types, $type_totals );
+		$type_totals = $this->normalize_type_totals_for_progress( $types, $type_totals );
 
 		$overall_total = 0;
 		$overall_processed = 0;
@@ -445,6 +440,16 @@ class AMS_Batcher {
 			'current_processed'  => $current_processed,
 			'status'             => $is_active ? 'in_progress' : 'queued',
 		];
+	}
+
+	private function normalize_type_totals_for_progress( array $types, array $type_totals ): array {
+		$normalized = [];
+
+		foreach ( $types as $type ) {
+			$normalized[ $type ] = max( 0, (int) ( $type_totals[ $type ] ?? 0 ) );
+		}
+
+		return $normalized;
 	}
 
 	private function resolve_type_totals_for_request( array $request, array $types, array $type_totals ): array {
