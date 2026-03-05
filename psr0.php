@@ -5,11 +5,7 @@ function ams_psr0_autoloader($class)
     // Check if the class belongs to our plugin's namespace
     if (strpos($class, 'AMS_') === 0) {
         $basedir = plugin_dir_path(__FILE__) . 'includes' . DIRECTORY_SEPARATOR;
-        if (str_starts_with($class, 'AMS_')) {
-            return ams_load_class_or_inetrface($class, $basedir);
-        } else {
-            throw new Exception("Class $class does not follow expected naming convention.");
-        }
+        return ams_load_class_or_inetrface($class, $basedir);
     }
 }
 
