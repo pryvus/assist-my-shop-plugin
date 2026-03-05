@@ -17,28 +17,40 @@ trait Trait_AMS_Data_Privacy
     /**
      * EU Member States and EEA countries for GDPR compliance
      */
-    private const EU_COUNTRIES = [
-        'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR',
-        'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL',
-        'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'IS', 'NO', 'LI', 'CH'
-    ];
+    private function get_eu_countries(): array
+    {
+        return [
+            'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR',
+            'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL',
+            'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'IS', 'NO', 'LI', 'CH'
+        ];
+    }
 
     /**
      * CCPA/CPRA regulated states (California + other states with similar laws)
      */
-    private const CCPA_STATES = [
-        'CA', 'CO', 'CT', 'DE', 'FL', 'MT', 'NE', 'NH', 'NJ', 'OR', 'TX', 'UT', 'VA'
-    ];
+    private function get_ccpa_states(): array
+    {
+        return [
+            'CA', 'CO', 'CT', 'DE', 'FL', 'MT', 'NE', 'NH', 'NJ', 'OR', 'TX', 'UT', 'VA'
+        ];
+    }
 
     /**
      * LGPD countries (Brazil and its territories)
      */
-    private const LGPD_COUNTRIES = ['BR'];
+    private function get_lgpd_countries(): array
+    {
+        return [ 'BR' ];
+    }
 
     /**
      * PIPEDA covered country (Canada)
      */
-    private const PIPEDA_COUNTRY = 'CA';
+    private function get_pipeda_country(): string
+    {
+        return 'CA';
+    }
 
     /**
      * Check if customer personal data should be restricted
@@ -90,22 +102,22 @@ trait Trait_AMS_Data_Privacy
         $regulations = [];
 
         // GDPR applies if store is in EU/EEA
-        if (in_array($store_country, self::EU_COUNTRIES)) {
+        if (in_array($store_country, $this->get_eu_countries(), true)) {
             $regulations[] = 'GDPR';
         }
 
         // CCPA/CPRA applies if store in California or customer in CCPA state
-        if ($store_country === 'US' && in_array($this->get_us_state($store_country), self::CCPA_STATES)) {
+        if ($store_country === 'US' && in_array($this->get_us_state($store_country), $this->get_ccpa_states(), true)) {
             $regulations[] = 'CCPA';
         }
 
         // LGPD applies if store in Brazil
-        if (in_array($store_country, self::LGPD_COUNTRIES)) {
+        if (in_array($store_country, $this->get_lgpd_countries(), true)) {
             $regulations[] = 'LGPD';
         }
 
         // PIPEDA applies if store in Canada
-        if ($store_country === self::PIPEDA_COUNTRY) {
+        if ($store_country === $this->get_pipeda_country()) {
             $regulations[] = 'PIPEDA';
         }
 
