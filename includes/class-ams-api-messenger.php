@@ -30,6 +30,13 @@ class AMS_Api_Messenger {
 	private mixed $store_api_key;
 
 	/**
+	 * Cache key for store connection and limit status.
+	 *
+	 * @var string
+	 */
+	private const STORE_STATUS_TRANSIENT = 'ams_store_status_snapshot';
+
+	/**
 	 * Constructor.
 	 *
 	 * @return void Initializes option-backed properties.
@@ -197,24 +204,62 @@ class AMS_Api_Messenger {
 	 */
 	public function validate_connection(): array {
 		if ( empty( $this->check_api_key() ) ) {
-			return [
+			$result = [
 				'success' => false,
 				'message' => 'API key is missing or invalid',
 			];
+			$this->cache_store_status( $result );
+			return $result;
 		}
 		$response = $this->send_to_saas_api('/store/validate', [
 			'store_url' => home_url(),
 		] );
 		if ( $response == null ) {
-			return [
+			$result = [
 				'success' => false,
 				'message' => 'No response from API',
 			];
+			$this->cache_store_status( $result );
+			return $result;
 		}
-		return [
-			'success' => $response['success'] ?? false,
-			'message' => $response['error'] ?? 'Unknown error',
+		$result = [
+			'success'    => $response['success'] ?? false,
+			'message'    => $response['error'] ?? $response['message'] ?? 'Unknown error',
+			'limit_reached' => ! empty( $response['limit_reached'] ),
+			'store_info' => is_array( $response['store_info'] ?? null ) ? $response['store_info'] : [],
+			'plan_info'  => is_array( $response['plan_info'] ?? null ) ? $response['plan_info'] : [],
 		];
+		$this->cache_store_status( $result );
+
+		return $result;
+	}
+
+	/**
+	 * Return cached store status snapshot and refresh when needed.
+	 *
+	 * @param bool $force_refresh Whether to bypass cache.
+	 * @return array<string, mixed> Store status snapshot.
+	 */
+	public function get_store_status_snapshot( bool $force_refresh = false ): array {
+		if ( ! $force_refresh ) {
+			$cached = get_transient( self::STORE_STATUS_TRANSIENT );
+			if ( is_array( $cached ) ) {
+				return $cached;
+			}
+		}
+
+		return $this->validate_connection();
+	}
+
+	/**
+	 * Persist store status snapshot in a transient.
+	 *
+	 * @param array<string, mixed> $status Store status payload.
+	 * @return void
+	 */
+	private function cache_store_status( array $status ): void {
+		$status['checked_at'] = time();
+		set_transient( self::STORE_STATUS_TRANSIENT, $status, 5 * MINUTE_IN_SECONDS );
 	}
 
 

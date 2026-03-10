@@ -16,6 +16,15 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+
+$store_status_snapshot = AMS_Api_Messenger::get()->get_store_status_snapshot();
+if ( ! empty( $store_status_snapshot['success'] ) && ! empty( $store_status_snapshot['limit_reached'] ) ) :
+	?>
+	<div class="notice notice-error">
+		<p><?php esc_html_e( 'Your store has reached its query limit. The chat widget is hidden on the storefront until requests become available again or the plan is upgraded.', 'assist-my-shop' ); ?></p>
+	</div>
+	<?php
+endif;
 ?>
 
 <form method="post" action="">
@@ -25,10 +34,40 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<tr>
 				<th scope="row"><?php esc_html_e( 'Connection Status', 'assist-my-shop' ); ?></th>
 				<td>
-					<span id="ams-connection-indicator" class="ams-connection-indicator"></span>
-					<span id="ams-connection-status-text"><?php esc_html_e( 'Checking connection...', 'assist-my-shop' ); ?></span>
-					<p class="description"><?php esc_html_e( 'Live status of plugin connection to backend API.', 'assist-my-shop' ); ?></p>
+					<div class="ams-status-card">
+						<div class="ams-status-card__header">
+							<strong><?php esc_html_e( 'Status', 'assist-my-shop' ); ?></strong>
+						</div>
+						<div class="ams-status-card__body">
+							<span id="ams-connection-indicator" class="ams-connection-indicator"></span>
+							<span id="ams-connection-status-text" class="ams-status-card__value"><?php esc_html_e( 'Checking connection...', 'assist-my-shop' ); ?></span>
+						</div>
+						<div class="ams-status-card__message"><?php esc_html_e( 'Live status of plugin connection to backend API.', 'assist-my-shop' ); ?></div>
+					</div>
 				</td>
+		</tr>
+		<tr>
+			<th scope="row"><?php esc_html_e( 'Current Plan & Limits', 'assist-my-shop' ); ?></th>
+			<td>
+				<div id="ams-plan-summary" class="ams-plan-summary">
+					<div class="ams-plan-summary__header">
+						<strong id="ams-plan-name"><?php esc_html_e( 'Loading...', 'assist-my-shop' ); ?></strong>
+						<button type="button" id="ams-refresh-store-status" class="ams-plan-summary__refresh">
+							<?php esc_html_e( 'Refresh', 'assist-my-shop' ); ?>
+						</button>
+					</div>
+					<div id="ams-plan-status-message" class="ams-plan-summary__message">
+						<?php esc_html_e( 'Connect the plugin to load your current plan and limits.', 'assist-my-shop' ); ?>
+					</div>
+					<div id="ams-plan-usage" class="ams-plan-summary__usage ams-hidden">-</div>
+					<div id="ams-plan-progress" class="ams-plan-summary__progress ams-hidden" aria-hidden="true">
+						<div id="ams-plan-progress-bar" class="ams-plan-summary__progress-bar"></div>
+					</div>
+					<div class="ams-plan-summary__hint">
+						<?php esc_html_e( 'Usage updates automatically every 5 minutes. Use Refresh to update it immediately after a plan or billing change.', 'assist-my-shop' ); ?>
+					</div>
+				</div>
+			</td>
 		</tr>
 		<tr>
 			<th scope="row"><?php esc_html_e( 'Enable Assist My Shop', 'assist-my-shop' ); ?></th>
