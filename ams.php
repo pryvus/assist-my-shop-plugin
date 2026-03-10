@@ -186,6 +186,11 @@ class AMS_WP_Plugin {
 			return;
 		}
 
+		$store_status = AMS_Api_Messenger::get()->get_store_status_snapshot();
+		if ( ! empty( $store_status['success'] ) && ! empty( $store_status['limit_reached'] ) ) {
+			return;
+		}
+
 		$chat_js  = $this->resolve_asset_path( 'assets/chat.js' );
 		$chat_css = $this->resolve_asset_path( 'assets/chat.css' );
 
@@ -331,6 +336,7 @@ class AMS_WP_Plugin {
 		$currency_code   = function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : 'USD';
 		$currency_symbol = function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol( $currency_code ) : '$';
 		$cart_url        = function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : home_url( '/cart/' );
+		$store_status    = AMS_Api_Messenger::get()->get_store_status_snapshot();
 
 		return [
 			'AmsAjax'     => [
@@ -342,6 +348,7 @@ class AMS_WP_Plugin {
 				'currency_code'     => $currency_code,
 				'currency_symbol'   => $currency_symbol,
 				'locale'            => str_replace( '_', '-', get_locale() ),
+				'limit_reached'     => ! empty( $store_status['limit_reached'] ),
 			],
 			'assistantName' => get_option( 'ams_assistant_name', '' ),
 		];

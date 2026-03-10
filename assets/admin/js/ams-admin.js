@@ -12,6 +12,63 @@
         if (el) el.innerHTML = msg;
     }
 
+    function formatDateRange(start, end) {
+        if (!start || !end) {
+            return t('not_available', 'Not available');
+        }
+
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+            return t('not_available', 'Not available');
+        }
+
+        return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+    }
+
+    function renderPlanInfo(planInfo) {
+        const planName = document.getElementById('ams-plan-name');
+        const planStatusMessage = document.getElementById('ams-plan-status-message');
+        const planUsage = document.getElementById('ams-plan-usage');
+        const planProgress = document.getElementById('ams-plan-progress');
+        const planProgressBar = document.getElementById('ams-plan-progress-bar');
+
+        if (!planName || !planStatusMessage || !planUsage || !planProgress || !planProgressBar) {
+            return;
+        }
+
+        if (!planInfo || typeof planInfo !== 'object' || !Object.keys(planInfo).length) {
+            planName.textContent = t('plan_unknown', 'Unknown plan');
+            planStatusMessage.textContent = t('not_connected_yet', 'Connect the plugin to load your current plan and limits.');
+            planUsage.classList.add('ams-hidden');
+            planUsage.textContent = '';
+            planProgress.classList.add('ams-hidden');
+            planProgressBar.style.width = '0%';
+            return;
+        }
+
+        const requestLimit = Number(planInfo.requests_per_cycle);
+        const requestsRemaining = Number(planInfo.requests_remaining);
+
+        planName.textContent = planInfo.name || t('plan_unknown', 'Unknown plan');
+        planStatusMessage.textContent = formatDateRange(planInfo.cycle_start, planInfo.cycle_end);
+
+        if (Number.isFinite(requestLimit) && Number.isFinite(requestsRemaining)) {
+            const requestsUsed = Math.max(0, requestLimit - requestsRemaining);
+            const usedPercent = requestLimit > 0 ? Math.min(100, Math.round((requestsUsed / requestLimit) * 100)) : 0;
+            planUsage.textContent = `Remaining ${requestsRemaining}/${requestLimit}`;
+            planUsage.classList.remove('ams-hidden');
+            planProgress.classList.remove('ams-hidden');
+            planProgressBar.style.width = `${usedPercent}%`;
+            return;
+        }
+
+        planUsage.textContent = t('not_available', 'Not available');
+        planUsage.classList.remove('ams-hidden');
+        planProgress.classList.add('ams-hidden');
+        planProgressBar.style.width = '0%';
+    }
+
     function updateProgress(progress) {
         const container = document.getElementById('ams-sync-progress-container');
         const bar = document.getElementById('ams-sync-progress');
@@ -94,23 +151,47 @@
         runPoll();
     }
 
-    function updateConnectionUI(connected, message) {
+    function updateConnectionUI(connected, message, limitReached) {
         const indicator = document.getElementById('ams-connection-indicator');
         const text = document.getElementById('ams-connection-status-text');
         if (!indicator || !text) return;
 
+        if (limitReached) {
+            indicator.style.background = '#dba617';
+            indicator.style.boxShadow = '0 0 0 4px rgba(219, 166, 23, 0.16)';
+            text.textContent = t('limit_reached', 'Query limit reached');
+            return;
+        }
+
         indicator.style.background = connected ? '#16a34a' : '#dc2626';
+        indicator.style.boxShadow = connected
+            ? '0 0 0 4px rgba(22, 163, 74, 0.16)'
+            : '0 0 0 4px rgba(220, 38, 38, 0.16)';
         text.textContent = connected
             ? t('connected', 'Connected')
             : `${t('not_connected', 'Not connected')}${message ? ': ' + message : ''}`;
     }
 
-    function checkConnectionStatus() {
+    function setRefreshButtonState(isLoading) {
+        const refreshButton = document.getElementById('ams-refresh-store-status');
+        if (!refreshButton) {
+            return;
+        }
+
+        refreshButton.disabled = isLoading;
+        refreshButton.textContent = isLoading
+            ? t('refreshing', 'Refreshing...')
+            : t('refresh', 'Refresh');
+    }
+
+    function checkConnectionStatus(forceRefresh = false) {
         const indicator = document.getElementById('ams-connection-indicator');
         const text = document.getElementById('ams-connection-status-text');
         if (!indicator || !text) return;
 
+        setRefreshButtonState(forceRefresh);
         indicator.style.background = '#9ca3af';
+        indicator.style.boxShadow = '0 0 0 4px rgba(156, 163, 175, 0.16)';
         text.textContent = t('checking_connection', 'Checking connection...');
 
         fetch(ajaxUrl, {
@@ -118,22 +199,36 @@
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({
                 action: 'ams_check_connection',
-                nonce: nonce
+                nonce: nonce,
+                refresh: forceRefresh ? '1' : ''
             })
         })
             .then(r => r.json())
             .then(data => {
+                setRefreshButtonState(false);
                 if (!data || !data.success || !data.data) {
-                    updateConnectionUI(false, t('unexpected_response', 'Unexpected response'));
+                    updateConnectionUI(false, t('unexpected_response', 'Unexpected response'), false);
+                    renderPlanInfo(null);
                     return;
                 }
-                updateConnectionUI(!!data.data.connected, data.data.message || '');
+                updateConnectionUI(!!data.data.connected, data.data.message || '', !!data.data.limit_reached);
+                renderPlanInfo(data.data.connected ? data.data.plan_info : null);
             })
-            .catch(() => updateConnectionUI(false, t('request_failed', 'Request failed')));
+            .catch(() => {
+                setRefreshButtonState(false);
+                updateConnectionUI(false, t('request_failed', 'Request failed'), false);
+                renderPlanInfo(null);
+            });
     }
 
     document.addEventListener('DOMContentLoaded', function(){
         checkConnectionStatus();
+        const refreshButton = document.getElementById('ams-refresh-store-status');
+        if (refreshButton) {
+            refreshButton.addEventListener('click', function(){
+                checkConnectionStatus(true);
+            });
+        }
 
         const btn = document.getElementById('ams-sync-now');
         if (!btn) return;

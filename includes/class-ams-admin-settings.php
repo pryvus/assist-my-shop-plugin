@@ -67,8 +67,11 @@ class AMS_Admin_Settings {
                 'connected'             => __( 'Connected', 'assist-my-shop' ),
                 'not_connected'         => __( 'Not connected', 'assist-my-shop' ),
                 'checking_connection'   => __( 'Checking connection...', 'assist-my-shop' ),
+                'refresh'               => __( 'Refresh', 'assist-my-shop' ),
+                'refreshing'            => __( 'Refreshing...', 'assist-my-shop' ),
                 'unexpected_response'   => __( 'Unexpected response', 'assist-my-shop' ),
                 'request_failed'        => __( 'Request failed', 'assist-my-shop' ),
+                'limit_reached'         => __( 'Query limit reached', 'assist-my-shop' ),
                 'failed_fetch_progress' => __( 'Failed to fetch progress', 'assist-my-shop' ),
                 'sync_in_progress'      => __( 'Sync in progress...', 'assist-my-shop' ),
                 'sync_complete'         => __( 'Sync complete — last sync:', 'assist-my-shop' ),
@@ -82,6 +85,13 @@ class AMS_Admin_Settings {
                 'items'                 => __( 'items', 'assist-my-shop' ),
                 'currently_syncing'     => __( 'Currently syncing:', 'assist-my-shop' ),
                 'unknown'               => __( 'Unknown', 'assist-my-shop' ),
+                'plan_unknown'          => __( 'Unknown plan', 'assist-my-shop' ),
+                'request_limit'         => __( 'Request limit', 'assist-my-shop' ),
+                'requests_used'         => __( 'Requests used', 'assist-my-shop' ),
+                'requests_remaining'    => __( 'Requests remaining', 'assist-my-shop' ),
+                'billing_cycle'         => __( 'Billing cycle', 'assist-my-shop' ),
+                'not_available'         => __( 'Not available', 'assist-my-shop' ),
+                'not_connected_yet'     => __( 'Connect the plugin to load your current plan and limits.', 'assist-my-shop' ),
             ],
         ] );
 
@@ -241,6 +251,24 @@ class AMS_Admin_Settings {
         <button class="button ams_photo_media_upload"><?php esc_html_e( 'Upload Image', 'assist-my-shop' ); ?></button>
         <button class="button ams_photo_media_remove"
                 class="<?php echo $media_id ? '' : 'is-hidden'; ?>"><?php esc_html_e( 'Remove Image', 'assist-my-shop' ); ?></button>
+        <?php
+    }
+
+    /**
+     * Render a text input field for an option-backed setting.
+     *
+     * @param string $option_name Option name stored in WordPress.
+     * @return void Outputs sanitized text input markup.
+     */
+    private function output_text_field( string $option_name ): void {
+        $value = get_option( $option_name, '' );
+        ?>
+        <input
+            type="text"
+            name="<?php echo esc_attr( $option_name ); ?>"
+            value="<?php echo esc_attr( (string) $value ); ?>"
+            class="regular-text"
+        />
         <?php
     }
 
@@ -412,10 +440,14 @@ class AMS_Admin_Settings {
             wp_send_json_error( [ 'message' => __( 'Insufficient permissions', 'assist-my-shop' ) ], 403 );
         }
 
-        $result = AMS_Api_Messenger::get()->validate_connection();
+        $force_refresh = ! empty( $_POST['refresh'] );
+        $result = AMS_Api_Messenger::get()->get_store_status_snapshot( $force_refresh );
         wp_send_json_success( [
             'connected' => ! empty( $result['success'] ),
             'message'   => $result['message'] ?? '',
+            'limit_reached' => ! empty( $result['limit_reached'] ),
+            'store_info' => $result['store_info'] ?? [],
+            'plan_info' => $result['plan_info'] ?? [],
         ] );
     }
 
