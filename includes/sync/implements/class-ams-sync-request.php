@@ -60,6 +60,17 @@ class AMS_Sync_Request {
 		];
 	}
 
+	public static function from_array( array $data ): self {
+		return new self(
+			$data['mode'] ?? 'full',
+			$data['types'] ?? [],
+			$data['ids'] ?? [],
+			$data['reason'] ?? '',
+			$data['request_id'] ?? '',
+			$data['created_at'] ?? 0
+		);
+	}
+
 	private function generate_request_id(): string {
 		if ( function_exists( 'wp_generate_uuid4' ) ) {
 			return wp_generate_uuid4();

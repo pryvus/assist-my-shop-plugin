@@ -8,11 +8,11 @@ class AMS_Source_Product implements AMS_Source_Interface
      */
     public function get_items_count(): int
     {
-        $orders = wc_get_products([
+        $products = wc_get_products([
             'limit' => -1,
             'return' => 'ids',
         ]);
-        $product_ids = $this->prepare_ids($orders);
+        $product_ids = $this->prepare_ids($products);
         return count($product_ids);
     }
 
