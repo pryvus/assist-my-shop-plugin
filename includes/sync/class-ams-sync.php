@@ -4,8 +4,10 @@ class AMS_Sync
     public static function init()
     {
         $batcher = new AMS_Batcher();
+        $as_engine = new AMS_Sync_AS();
+        $as_engine->register();
 
-        $orchestrator = new AMS_Sync_Orchestrator($batcher);
+        $orchestrator = new AMS_Sync_Orchestrator($batcher, $as_engine);
         $admin = new AMS_Sync_Admin($orchestrator);
         $triggers = new AMS_Sync_Triggers($orchestrator);
 

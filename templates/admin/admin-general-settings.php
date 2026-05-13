@@ -85,6 +85,23 @@ endif;
 			</td>
 		</tr>
 		<tr>
+			<th scope="row"><?php esc_html_e( 'Sync Engine', 'assist-my-shop' ); ?></th>
+			<td>
+				<?php $sync_engine = get_option( 'ams_sync_engine', 'batcher' ); ?>
+				<fieldset>
+					<label>
+						<input type="radio" name="sync_engine" value="batcher" <?php checked( $sync_engine, 'batcher' ); ?> />
+						<?php esc_html_e( 'Batcher (default)', 'assist-my-shop' ); ?>
+					</label><br>
+					<label>
+						<input type="radio" name="sync_engine" value="action_scheduler" <?php checked( $sync_engine, 'action_scheduler' ); ?> />
+						<?php esc_html_e( 'Action Scheduler jobs (50 items per job)', 'assist-my-shop' ); ?>
+					</label>
+					<p class="description"><?php esc_html_e( 'Batcher uses the internal queue with cron-driven chunking. Action Scheduler schedules one job per 50 items; jobs run sequentially in the assist-my-shop group.', 'assist-my-shop' ); ?></p>
+				</fieldset>
+			</td>
+		</tr>
+		<tr>
 			<th scope="row"><?php esc_html_e( 'Content Types to Sync', 'assist-my-shop' ); ?></th>
 			<td>
 				<fieldset>
@@ -119,7 +136,9 @@ endif;
 <?php
 $ams_batcher = null;
 $sync_progress = null;
-if ( class_exists( 'AMS_Batcher' ) ) {
+$active_engine = get_option( 'ams_sync_engine', 'batcher' );
+
+if ( $active_engine === 'batcher' && class_exists( 'AMS_Batcher' ) ) {
 	$ams_batcher = new AMS_Batcher();
 	$sync_progress = $ams_batcher->get_sync_progress_snapshot();
 }
@@ -128,23 +147,46 @@ if ( ! $sync_progress ) {
 	$sync_progress = get_option( 'ams_sync_progress', null );
 }
 
-if ( $sync_progress ) {
-	$overall_total = (int) ( $sync_progress['overall_total'] ?? 0 );
-	$overall_processed = (int) ( $sync_progress['overall_processed'] ?? 0 );
-	$current_total = (int) ( $sync_progress['current_total'] ?? 0 );
-	$current_processed = (int) ( $sync_progress['current_processed'] ?? 0 );
-	$percent = $overall_total > 0 ? round( ( $overall_processed / $overall_total ) * 100 ) : 0;
-	$status = (string) ( $sync_progress['status'] ?? 'in_progress' );
+if ( is_array( $sync_progress ) && ! empty( $sync_progress ) ) {
+	if ( isset( $sync_progress['total'] ) ) {
+		$total = (int) $sync_progress['total'];
+	} elseif ( isset( $sync_progress['overall_total'] ) ) {
+		$total = (int) $sync_progress['overall_total'];
+	} else {
+		$total = 0;
+	}
+
+	if ( isset( $sync_progress['processed'] ) ) {
+		$processed = (int) $sync_progress['processed'];
+	} elseif ( isset( $sync_progress['overall_processed'] ) ) {
+		$processed = (int) $sync_progress['overall_processed'];
+	} else {
+		$processed = 0;
+	}
+
+	$percent = $total > 0 ? (int) round( ( $processed / $total ) * 100 ) : 0;
+	$status = isset( $sync_progress['status'] ) ? (string) $sync_progress['status'] : 'in_progress';
+
 	echo '<div class="notice notice-info inline">';
 	if ( $status === 'queued' ) {
-		echo '<p><strong>Background sync queued.</strong> Waiting for worker...</p>';
+		echo '<p><strong>' . esc_html__( 'Background sync queued.', 'assist-my-shop' ) . '</strong> ' . esc_html__( 'Waiting for worker...', 'assist-my-shop' ) . '</p>';
+	} elseif ( $status === 'completed' ) {
+		echo '<p><strong>' . esc_html__( 'Last sync completed.', 'assist-my-shop' ) . '</strong></p>';
 	}
-	echo '<p><strong>Background sync in progress:</strong> ' . esc_html( (string) $overall_processed ) . ' of ' . esc_html( (string) $overall_total ) . ' items (' . esc_html( (string) intval( $percent ) ) . '%)</p>';
+	echo '<p><strong>' . esc_html__( 'Progress:', 'assist-my-shop' ) . '</strong> '
+		. esc_html( (string) $processed ) . ' '
+		. esc_html__( 'of', 'assist-my-shop' ) . ' '
+		. esc_html( (string) $total ) . ' '
+		. esc_html__( 'items', 'assist-my-shop' )
+		. ' (' . esc_html( (string) $percent ) . '%)</p>';
+
 	if ( ! empty( $sync_progress['current_post_type'] ) ) {
+		$current_total = isset( $sync_progress['current_total'] ) ? (int) $sync_progress['current_total'] : 0;
+		$current_processed = isset( $sync_progress['current_processed'] ) ? (int) $sync_progress['current_processed'] : 0;
 		echo '<p>';
 		printf(
 			esc_html__( 'Currently syncing: %1$s (%2$d of %3$d)', 'assist-my-shop' ),
-			esc_html( $sync_progress['current_post_type'] ),
+			esc_html( (string) $sync_progress['current_post_type'] ),
 			$current_processed,
 			$current_total
 		);
