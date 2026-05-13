@@ -305,6 +305,13 @@ class AMS_Admin_Settings {
                 ? array_map( 'sanitize_text_field', $POST['post_types'] )
                 : [];
         update_option( 'ams_post_types', $selected_post_types );
+
+        // Sync engine selection.
+        $engine = 'batcher';
+        if ( isset( $POST['sync_engine'] ) && $POST['sync_engine'] === 'action_scheduler' ) {
+            $engine = 'action_scheduler';
+        }
+        update_option( 'ams_sync_engine', $engine );
     }
 
     /**
