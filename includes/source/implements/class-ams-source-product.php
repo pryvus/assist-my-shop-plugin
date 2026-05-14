@@ -10,6 +10,7 @@ class AMS_Source_Product implements AMS_Source_Interface
     {
         $products = wc_get_products([
             'limit' => -1,
+			'status' => 'publish',
             'return' => 'ids',
         ]);
         $product_ids = $this->prepare_ids($products);
@@ -20,6 +21,7 @@ class AMS_Source_Product implements AMS_Source_Interface
     {
         $products = wc_get_products([
             'limit' => -1,
+            'status' => 'publish',
             'return' => 'ids',
         ]);
 
@@ -34,6 +36,7 @@ class AMS_Source_Product implements AMS_Source_Interface
     {
         $products = wc_get_products([
             'limit' => -1,
+            'status' => 'publish',
             'return' => 'ids',
         ]);
         return $this->get_formatted_products($products);
