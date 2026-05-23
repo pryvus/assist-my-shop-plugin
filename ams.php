@@ -47,6 +47,7 @@ class AMS_WP_Plugin {
 		$this->integrate_chat();
 		$this->manage_sync();
 		$this->add_admin_pages();
+		$this->register_rest_controllers();
 
 		// Initialize GitHub auto-updater (uses releases from the configured repo)
 		// Default repo owner/name can be changed or exposed via admin settings.
@@ -148,6 +149,15 @@ class AMS_WP_Plugin {
 	 */
 	private function integrate_chat(): void {
 		new AMS_Chat_Manager();
+	}
+
+	/**
+	 * Register REST API controllers consumed by the SaaS backend.
+	 *
+	 * @return void
+	 */
+	private function register_rest_controllers(): void {
+		new AMS_Orders_Rest_Controller();
 	}
 
 	/**

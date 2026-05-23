@@ -157,7 +157,6 @@
 .ams-message-assistant .ams-message-content {
     border: 1px solid var(--ams-border-color);
     background: var(--ams-background);
-    box-shadow: 0 2px 4px var(--ams-shadow-light);
     color: var(--ams-text-primary);
 }
 
@@ -289,8 +288,8 @@
     #ams-chat-container {
         width: calc(100vw - 20px);
         height: 400px;
-        right: 10px;
-        left: 10px;
+        left: auto;
+        right: -5px;
     }
 
     #ams-chat-toggle {
@@ -656,4 +655,213 @@
         transform: scale(1);
         opacity: 1;
     }
+}
+
+#ams-chat-widget .ams-orders-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 12px 0;
+}
+
+#ams-chat-widget .ams-order-card {
+    display: block;
+    border-radius: 10px;
+    background: var(--ams-background);
+    transition: box-shadow 0.2s ease;
+}
+
+#ams-chat-widget .ams-order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+#ams-chat-widget .ams-order-number {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--ams-text-primary);
+}
+
+#ams-chat-widget .ams-order-status-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: #fff;
+    background: var(--ams-text-light);
+    text-transform: capitalize;
+    white-space: nowrap;
+}
+
+#ams-chat-widget .ams-order-status-completed,
+#ams-chat-widget .ams-order-status-delivered {
+    background: var(--ams-success-color);
+}
+
+#ams-chat-widget .ams-order-status-processing,
+#ams-chat-widget .ams-order-status-on-hold {
+    background: #3b82f6;
+}
+
+#ams-chat-widget .ams-order-status-pending,
+#ams-chat-widget .ams-order-status-pending-payment {
+    background: var(--ams-warning-color);
+    color: #4a3a00;
+}
+
+#ams-chat-widget .ams-order-status-cancelled,
+#ams-chat-widget .ams-order-status-failed,
+#ams-chat-widget .ams-order-status-refunded {
+    background: var(--ams-error-color);
+}
+
+#ams-chat-widget .ams-order-date {
+    font-size: 12px;
+    color: var(--ams-text-secondary);
+    margin-bottom: 6px;
+}
+
+#ams-chat-widget .ams-order-items {
+    list-style: none;
+    padding: 6px 0;
+    margin: 4px 0;
+    border-top: 1px solid var(--ams-border-light);
+    border-bottom: 1px solid var(--ams-border-light);
+}
+
+#ams-chat-widget .ams-order-line-item {
+    font-size: 12px;
+    color: var(--ams-text-primary);
+    padding: 2px 0;
+    line-height: 1.4;
+}
+
+#ams-chat-widget .ams-order-line-qty {
+    font-weight: 600;
+    color: var(--ams-text-secondary);
+    margin-right: 4px;
+}
+
+#ams-chat-widget .ams-order-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+#ams-chat-widget .ams-order-total {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--ams-text-primary);
+}
+
+#ams-chat-widget .ams-order-view-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    background: none;
+    color: var(--ams-primary-color);
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    transition: color 0.2s ease;
+}
+
+#ams-chat-widget .ams-order-view-link:hover {
+    color: var(--ams-primary-hover);
+    text-decoration: underline;
+}
+
+#ams-chat-widget .ams-inline-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 10px 0;
+    padding: 12px;
+    border: 1px solid var(--ams-border-color);
+    border-radius: 10px;
+    background: var(--ams-background-light);
+}
+
+#ams-chat-widget .ams-inline-form.ams-inline-form-retired {
+    display: none;
+}
+
+#ams-chat-widget .ams-inline-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#ams-chat-widget .ams-inline-form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ams-text-secondary);
+}
+
+#ams-chat-widget .ams-inline-form-input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border: 1px solid var(--ams-border-light);
+    border-radius: 8px;
+    font-size: 13px;
+    background: var(--ams-background);
+    color: var(--ams-text-primary);
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+#ams-chat-widget .ams-inline-form-input:focus {
+    border-color: var(--ams-primary-color);
+}
+
+#ams-chat-widget .ams-inline-form-input:disabled {
+    background: var(--ams-background-light);
+    color: var(--ams-text-light);
+    cursor: not-allowed;
+}
+
+#ams-chat-widget .ams-inline-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+#ams-chat-widget .ams-inline-form-submit {
+    padding: 8px 14px;
+    background: linear-gradient(135deg, var(--ams-primary-gradient-start) 0%, var(--ams-primary-gradient-end) 100%);
+    color: var(--ams-primary-gradient-color);
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.2s ease, opacity 0.2s ease;
+}
+
+#ams-chat-widget .ams-inline-form-submit:hover {
+    filter: brightness(0.94);
+}
+
+#ams-chat-widget .ams-inline-form-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    filter: none;
+}
+
+#ams-chat-widget .ams-inline-form-error {
+    font-size: 12px;
+    color: var(--ams-error-color);
+    min-height: 14px;
 }

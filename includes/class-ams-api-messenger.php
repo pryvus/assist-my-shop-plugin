@@ -229,6 +229,11 @@ class AMS_Api_Messenger {
 			'store_info' => is_array( $response['store_info'] ?? null ) ? $response['store_info'] : [],
 			'plan_info'  => is_array( $response['plan_info'] ?? null ) ? $response['plan_info'] : [],
 		];
+
+		if ( isset( $result['store_info']['id'] ) && is_numeric( $result['store_info']['id'] ) ) {
+			update_option( 'ams_store_id', (int) $result['store_info']['id'], false );
+		}
+
 		$this->cache_store_status( $result );
 
 		return $result;
