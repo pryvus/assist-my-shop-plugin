@@ -53,6 +53,16 @@ class AmsChat {
                 }
             });
         }
+
+        if (this.messagesContainer) {
+            this.messagesContainer.addEventListener('submit', (e) => {
+                const form = e.target;
+                if (form && form.classList && form.classList.contains('ams-inline-form')) {
+                    e.preventDefault();
+                    this.handleInlineFormSubmit(form);
+                }
+            });
+        }
     }
 
     toggleChat() {
@@ -244,6 +254,8 @@ class AmsChat {
                 this.addMessage('assistant', {
                     text: data.message_text || data.message || '',
                     products: Array.isArray(data.products) ? data.products : [],
+                    orders: Array.isArray(data.orders) ? data.orders : [],
+                    form: (data.form && typeof data.form === 'object') ? data.form : null,
                 });
                 if (data.session_id) {
                     this.sessionId = data.session_id;
@@ -266,9 +278,22 @@ class AmsChat {
 
         const messageContent = document.createElement('div');
         messageContent.className = 'ams-message-content';
-        // Sanitize final HTML before inserting to prevent XSS (use DOMPurify if available)
-        const rawHtml = this.formatMessageContent(normalizedContent.text, normalizedContent.products);
-        messageContent.innerHTML = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(rawHtml) : rawHtml;
+        // Render text + product/order cards via the sanitized HTML pipeline.
+        // The form, if any, is appended via the DOM API afterwards — DOMPurify
+        // strips <form>/<input> aggressively even with ADD_TAGS, so we build the
+        // form's nodes directly rather than through innerHTML.
+        const rawHtml = this.formatMessageContent(normalizedContent.text, normalizedContent.products, normalizedContent.orders, null);
+        messageContent.innerHTML = this.sanitizeWidgetHTML(rawHtml);
+        if (normalizedContent.form && typeof normalizedContent.form === 'object') {
+            const formEl = this.buildInlineFormElement(normalizedContent.form);
+            if (formEl) {
+                // Retire any earlier active lookup forms — only the most recent
+                // form should be interactive. Older ones get hidden so the user
+                // isn't left wondering which of N identical forms to fill in.
+                this.retireOlderInlineForms();
+                messageContent.appendChild(formEl);
+            }
+        }
 
         const messageDate = messageTime ? new Date(messageTime) : new Date();
         const timestamp = document.createElement('div');
@@ -294,14 +319,21 @@ class AmsChat {
             return {
                 text: typeof content === 'string' ? content : '',
                 products: [],
+                orders: [],
+                form: null,
                 raw: content,
             };
         }
 
         if (content && typeof content === 'object' && !Array.isArray(content)) {
+            const form = (content.form && typeof content.form === 'object' && !Array.isArray(content.form))
+                ? content.form
+                : null;
             return {
                 text: typeof content.text === 'string' ? content.text : '',
                 products: Array.isArray(content.products) ? content.products : [],
+                orders: Array.isArray(content.orders) ? content.orders : [],
+                form,
                 raw: content,
             };
         }
@@ -309,11 +341,32 @@ class AmsChat {
         return {
             text: typeof content === 'string' ? content : '',
             products: [],
+            orders: [],
+            form: null,
             raw: content,
         };
     }
 
-    formatMessageContent(content, products = []) {
+    formatMessageContent(content, products = [], orders = [], form = null) {
+        if (form && typeof form === 'object' && Array.isArray(form.fields) && form.fields.length > 0) {
+            const processedText = this.formatTextContent(content || '');
+            const formHtml = this.renderInlineForm(form);
+            if (!processedText) {
+                return formHtml;
+            }
+            return processedText + '<br><br>' + formHtml;
+        }
+
+        if (Array.isArray(orders) && orders.length > 0) {
+            const processedText = this.formatTextContent(content || '');
+            const ordersHtml = this.renderOrderCards(orders);
+            if (!processedText) {
+                return ordersHtml;
+            }
+
+            return processedText + '<br><br>' + ordersHtml;
+        }
+
         if (Array.isArray(products) && products.length > 0) {
             const processedText = this.formatTextContent(content || '');
             const productsHtml = this.renderProductCards(products);
@@ -403,6 +456,337 @@ class AmsChat {
                 <div class="ams-product-actions">${actions}</div>
             </div>
         `;
+    }
+
+    handleInlineFormSubmit(formEl) {
+        if (!formEl || formEl.dataset.amsSubmitted === '1') {
+            return;
+        }
+        const formId = formEl.getAttribute('data-form-id') || 'inline_form';
+        const inputs = formEl.querySelectorAll('input.ams-inline-form-input');
+        const values = {};
+        let missing = '';
+
+        inputs.forEach((input) => {
+            const name = input.getAttribute('name');
+            if (!name) {
+                return;
+            }
+            const value = String(input.value || '').trim();
+            if (input.hasAttribute('required') && value === '') {
+                if (!missing) {
+                    missing = input.previousElementSibling && input.previousElementSibling.textContent
+                        ? input.previousElementSibling.textContent.replace(/\s*\*\s*$/, '').trim()
+                        : name;
+                }
+            }
+            values[name] = value;
+        });
+
+        const errorEl = formEl.querySelector('.ams-inline-form-error');
+        if (missing) {
+            if (errorEl) {
+                errorEl.textContent = `${missing} is required`;
+            }
+            return;
+        }
+        if (errorEl) {
+            errorEl.textContent = '';
+        }
+
+        formEl.dataset.amsSubmitted = '1';
+        const submitBtn = formEl.querySelector('.ams-inline-form-submit');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Looking up…';
+        }
+        inputs.forEach((input) => { input.disabled = true; });
+
+        // IMPORTANT: never put the email or order number in the user-visible echo
+        // or the message field. OrderLookupExtractor scans the last 6 user
+        // messages for credentials when the current message lacks them, so any
+        // creds leaked into the transcript would be picked up automatically by
+        // every later order question — even after the user wants to retry with
+        // different details. Form values travel exclusively through
+        // lookup_form_response.
+        const userEcho = 'Submitted order lookup form';
+        this.addMessage('user', userEcho);
+
+        this.sendLookupFormResponse(formId, values);
+    }
+
+    async sendLookupFormResponse(formId, values) {
+        this.showTyping();
+        try {
+            const amsAjax = this.getAmsAjax();
+            const params = new URLSearchParams({
+                action: 'ams_chat',
+                nonce: amsAjax.nonce || '',
+                message: 'Submitted order lookup form',
+                session_id: this.sessionId,
+            });
+            params.append('lookup_form_response[form_id]', formId);
+            Object.keys(values).forEach((key) => {
+                params.append(`lookup_form_response[values][${key}]`, String(values[key]));
+            });
+
+            const response = await fetch(amsAjax.ajax_url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params,
+            });
+
+            const data = await response.json();
+            this.hideTyping();
+
+            if (data.success) {
+                this.addMessage('assistant', {
+                    text: data.message_text || data.message || '',
+                    products: Array.isArray(data.products) ? data.products : [],
+                    orders: Array.isArray(data.orders) ? data.orders : [],
+                    form: (data.form && typeof data.form === 'object') ? data.form : null,
+                });
+                if (data.session_id) {
+                    this.sessionId = data.session_id;
+                }
+            } else {
+                this.addMessage('assistant', data.error || 'Sorry, I encountered an error. Please try again.');
+            }
+        } catch (error) {
+            this.hideTyping();
+            this.addMessage('assistant', 'Sorry, I\'m having trouble connecting. Please try again later.');
+        }
+    }
+
+    retireOlderInlineForms() {
+        if (!this.messagesContainer) {
+            return;
+        }
+        const existing = this.messagesContainer.querySelectorAll('.ams-inline-form:not(.ams-inline-form-retired)');
+        existing.forEach((formEl) => {
+            formEl.classList.add('ams-inline-form-retired');
+            formEl.querySelectorAll('input, button').forEach((el) => { el.disabled = true; });
+        });
+    }
+
+    buildInlineFormElement(form) {
+        if (!form || typeof form !== 'object' || !Array.isArray(form.fields) || form.fields.length === 0) {
+            return null;
+        }
+        const formId = typeof form.id === 'string' && form.id ? form.id : 'inline_form';
+        const submitLabel = typeof form.submit_label === 'string' && form.submit_label ? form.submit_label : 'Submit';
+
+        const formEl = document.createElement('form');
+        formEl.className = 'ams-inline-form';
+        formEl.setAttribute('data-form-id', formId);
+
+        form.fields.forEach((field) => {
+            if (!field || typeof field !== 'object') {
+                return;
+            }
+            const name = typeof field.name === 'string' ? field.name : '';
+            if (!name) {
+                return;
+            }
+            const fieldLabel = typeof field.label === 'string' ? field.label : name;
+            const fieldType = typeof field.type === 'string' ? field.type : 'text';
+            const required = field.required === true;
+            const fieldId = ('ams-form-' + formId + '-' + name).replace(/[^a-zA-Z0-9_-]/g, '-');
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'ams-inline-form-field';
+
+            const label = document.createElement('label');
+            label.className = 'ams-inline-form-label';
+            label.setAttribute('for', fieldId);
+            label.textContent = fieldLabel + (required ? ' *' : '');
+
+            const input = document.createElement('input');
+            input.className = 'ams-inline-form-input';
+            input.id = fieldId;
+            input.type = fieldType;
+            input.name = name;
+            input.autocomplete = 'off';
+            if (required) {
+                input.required = true;
+            }
+
+            wrapper.appendChild(label);
+            wrapper.appendChild(input);
+            formEl.appendChild(wrapper);
+        });
+
+        const actions = document.createElement('div');
+        actions.className = 'ams-inline-form-actions';
+        const submitBtn = document.createElement('button');
+        submitBtn.type = 'submit';
+        submitBtn.className = 'ams-inline-form-submit';
+        submitBtn.textContent = submitLabel;
+        actions.appendChild(submitBtn);
+        formEl.appendChild(actions);
+
+        const errorEl = document.createElement('div');
+        errorEl.className = 'ams-inline-form-error';
+        errorEl.setAttribute('role', 'alert');
+        errorEl.setAttribute('aria-live', 'polite');
+        formEl.appendChild(errorEl);
+
+        return formEl;
+    }
+
+    renderInlineForm(form) {
+        if (!form || typeof form !== 'object') {
+            return '';
+        }
+        const formId = this.escapeHtmlAttr(typeof form.id === 'string' ? form.id : 'inline_form');
+        const submitLabel = this.escapeHtmlSafely(typeof form.submit_label === 'string' && form.submit_label ? form.submit_label : 'Submit');
+
+        const fields = Array.isArray(form.fields) ? form.fields : [];
+        const fieldsHtml = fields
+            .map((field) => {
+                if (!field || typeof field !== 'object') {
+                    return '';
+                }
+                const name = this.escapeHtmlAttr(typeof field.name === 'string' ? field.name : '');
+                if (!name) {
+                    return '';
+                }
+                const label = this.escapeHtmlSafely(typeof field.label === 'string' ? field.label : name);
+                const type = this.escapeHtmlAttr(typeof field.type === 'string' ? field.type : 'text');
+                const required = field.required ? 'required' : '';
+                const fieldId = `ams-form-${formId}-${name}`.replace(/[^a-zA-Z0-9_-]/g, '-');
+                return `
+                    <div class="ams-inline-form-field">
+                        <label class="ams-inline-form-label" for="${fieldId}">${label}${field.required ? ' *' : ''}</label>
+                        <input class="ams-inline-form-input" id="${fieldId}" type="${type}" name="${name}" ${required} autocomplete="off">
+                    </div>
+                `;
+            })
+            .filter(Boolean)
+            .join('');
+
+        if (!fieldsHtml) {
+            return '';
+        }
+
+        return `
+            <form class="ams-inline-form" data-form-id="${formId}">
+                ${fieldsHtml}
+                <div class="ams-inline-form-actions">
+                    <button type="submit" class="ams-inline-form-submit">${submitLabel}</button>
+                </div>
+                <div class="ams-inline-form-error" role="alert" aria-live="polite"></div>
+            </form>
+        `;
+    }
+
+    renderOrderCards(orders) {
+        const cards = orders
+            .map((order) => this.renderOrderCard(order))
+            .filter(Boolean)
+            .join('');
+
+        if (!cards) {
+            return '';
+        }
+
+        return `<div class="ams-orders-grid">${cards}</div>`;
+    }
+
+    renderOrderCard(order) {
+        if (!order || typeof order !== 'object') {
+            return '';
+        }
+
+        const orderNumber = this.escapeHtmlSafely(order.order_number || String(order.id || ''));
+        const statusRaw = String(order.status || '').toLowerCase();
+        const statusLabel = this.escapeHtmlSafely(this.formatOrderStatusLabel(statusRaw));
+        const statusClass = `ams-order-status-${statusRaw.replace(/[^a-z0-9_-]/g, '-')}`;
+        const dateText = this.escapeHtmlSafely(this.formatOrderDate(order.order_date));
+        const totalText = this.escapeHtmlSafely(this.formatOrderTotal(order.total, order.currency));
+        const viewUrl = this.escapeHtmlAttr(order.view_url || '#');
+
+        const items = Array.isArray(order.line_items) ? order.line_items : [];
+        const itemsHtml = items
+            .map((item) => {
+                if (!item || typeof item !== 'object') {
+                    return '';
+                }
+                const name = this.escapeHtmlSafely(item.name || 'item');
+                const quantity = Number(item.quantity);
+                const qtyLabel = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+                return `<li class="ams-order-line-item"><span class="ams-order-line-qty">${qtyLabel}×</span> ${name}</li>`;
+            })
+            .filter(Boolean)
+            .join('');
+
+        const viewAction = viewUrl && viewUrl !== '#'
+            ? `<a class="ams-order-view-link" href="${viewUrl}" target="_blank" rel="noopener noreferrer">View order →</a>`
+            : '';
+
+        return `
+            <div class="ams-order-card">
+                <div class="ams-order-header">
+                    <span class="ams-order-number">Order #${orderNumber}</span>
+                    <span class="ams-order-status-pill ${statusClass}">${statusLabel}</span>
+                </div>
+                ${dateText ? `<div class="ams-order-date">Placed ${dateText}</div>` : ''}
+                ${itemsHtml ? `<ul class="ams-order-items">${itemsHtml}</ul>` : ''}
+                <div class="ams-order-footer">
+                    ${totalText ? `<span class="ams-order-total">${totalText}</span>` : '<span></span>'}
+                    ${viewAction}
+                </div>
+            </div>
+        `;
+    }
+
+    formatOrderStatusLabel(status) {
+        if (!status) {
+            return '';
+        }
+        return status
+            .split(/[-_\s]+/)
+            .filter(Boolean)
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(' ');
+    }
+
+    formatOrderDate(value) {
+        if (!value || typeof value !== 'string') {
+            return '';
+        }
+        const date = new Date(value);
+        if (isNaN(date.getTime())) {
+            return value;
+        }
+        try {
+            return new Intl.DateTimeFormat(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+            }).format(date);
+        } catch (e) {
+            return value;
+        }
+    }
+
+    formatOrderTotal(total, currency) {
+        const numericTotal = Number(total);
+        if (!Number.isFinite(numericTotal)) {
+            return '';
+        }
+
+        const currencyCode = String(currency || '').toUpperCase() || 'USD';
+        try {
+            return new Intl.NumberFormat(undefined, {
+                style: 'currency',
+                currency: currencyCode,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }).format(numericTotal);
+        } catch (e) {
+            return `${numericTotal.toFixed(2)} ${currencyCode}`;
+        }
     }
 
     buildAddToCartUrl(productId) {
@@ -565,6 +949,28 @@ class AmsChat {
         });
 
         return parsed;
+    }
+
+    sanitizeWidgetHTML(rawHtml) {
+        if (typeof DOMPurify === 'undefined') {
+            return rawHtml;
+        }
+        // Explicitly allow the form-related tags/attributes our inline-form renderer
+        // emits. DOMPurify's default profile is conservative around <form>/<input>,
+        // so without ADD_TAGS/ADD_ATTR the lookup form gets stripped to bare labels.
+        return DOMPurify.sanitize(rawHtml, {
+            ADD_TAGS: ['form'],
+            ADD_ATTR: [
+                'data-form-id',
+                'autocomplete',
+                'required',
+                'name',
+                'type',
+                'role',
+                'aria-live',
+                'for',
+            ],
+        });
     }
 
     sanitizeProductHTML(html) {
@@ -823,6 +1229,8 @@ class AmsChat {
                         ? {
                             text: msg.message_text || msg.message || '',
                             products: Array.isArray(msg.products) ? msg.products : [],
+                            orders: Array.isArray(msg.orders) ? msg.orders : [],
+                            form: (msg.form && typeof msg.form === 'object') ? msg.form : null,
                         }
                         : (msg.message || '');
 
